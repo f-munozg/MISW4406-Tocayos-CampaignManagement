@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  campaign-management:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - DATABASE_URL=postgresql://user:password@postgres:5432/campaign_management
+      - PULSAR_SERVICE_URL=pulsar://pulsar:6650
+      - PULSAR_ADMIN_URL=http://pulsar:8080
+      - FLASK_ENV=development
+    depends_on:
+      - postgres
+      - pulsar
+      - pulsar-init
+    volumes:
+      - ./src:/app/src
+    networks:
+      - campaign-management-network
+
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=campaign_management
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - campaign-management-network
+
+  pulsar:
+    image: apachepulsar/pulsar:3.1.0
+    command: bin/pulsar standalone --no-functions-worker --no-stream-storage
+    ports:
+      - "6650:6650"
+      - "8080:8080"
+    environment:
+      - PULSAR_MEM=-Xms512m -Xmx512m -XX:MaxDirectMemorySize=1g
+    volumes:
+      - pulsar_data:/pulsar/data
+    networks:
+      - campaign-management-network
+
+  pulsar-init:
+    image: apachepulsar/pulsar:3.1.0
+    depends_on:
+      - pulsar
+    volumes:
+      - ./scripts/init-pulsar.sh:/init-pulsar.sh
+    command: ["sh", "/init-pulsar.sh"]
+    networks:
+      - campaign-management-network
+
+  pulsar-manager:
+    image: apachepulsar/pulsar-manager:v0.4.0
+    ports:
+      - "9527:9527"
+      - "7750:7750"
+    environment:
+      - SPRING_CONFIGURATION_FILE=/pulsar-manager/pulsar-manager/application.properties
+    command: ["sh", "-c", "bin/pulsar-manager"]
+    depends_on:
+      - pulsar
+    networks:
+      - campaign-management-network
+
+volumes:
+  postgres_data:
+  pulsar_data:
+
+networks:
+  campaign-management-network:
+    driver: bridge
