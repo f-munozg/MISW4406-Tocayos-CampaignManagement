@@ -18,11 +18,13 @@ logger = logging.getLogger(__name__)
 cfg = PulsarConfig()
 
 TOPIC_CAMPAIGN = "campaign-events"
+TOPIC_CONTENT = "content-events"
 
 def _publish_one(conn, row):
     payload = json.loads(row["payload"])
     key = row["aggregate_id"]
     pulsar_publisher.publish_json(TOPIC_CAMPAIGN, key=key, payload=payload)
+    pulsar_publisher.publish_json(TOPIC_CONTENT, key=key, payload=payload)
     conn.execute(
         text("UPDATE outbox_events SET status='PUBLISHED', published_at=:ts WHERE id=:id"),
         {"id": row["id"], "ts": datetime.utcnow()}

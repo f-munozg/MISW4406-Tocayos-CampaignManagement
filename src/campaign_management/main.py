@@ -89,20 +89,20 @@ def create_app():
         logger.error(f"Error registrando blueprint de campaign management: {e}")
     
     # Inicializar servicios de Pulsar (opcional)
-    # try:
-    #     from campaign_management.infraestructura.event_consumer_service import event_consumer_service
-    #     from campaign_management.infraestructura.pulsar import pulsar_publisher
-    #     import atexit
+    try:
+        from campaign_management.infraestructura.event_consumer_service import event_consumer_service
+        from campaign_management.infraestructura.pulsar import pulsar_publisher
+        import atexit
         
-    #     # Iniciar el servicio de consumo de eventos
-    #     event_consumer_service.start_consuming()
-    #     logger.info("Servicio de consumo de eventos iniciado")
+        # Iniciar el servicio de consumo de eventos
+        event_consumer_service.start_consuming()
+        logger.info("Servicio de consumo de eventos iniciado")
         
-    #     # Registrar función de limpieza al cerrar la aplicación
-    #     atexit.register(cleanup_pulsar_connections)
+        # Registrar función de limpieza al cerrar la aplicación
+        atexit.register(cleanup_pulsar_connections)
         
-    # except Exception as e:
-    #     logger.warning(f"Pulsar no disponible, continuando sin eventos: {e}")
+    except Exception as e:
+        logger.warning(f"Pulsar no disponible, continuando sin eventos: {e}")
     
     return app
 

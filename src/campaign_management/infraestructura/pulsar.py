@@ -14,6 +14,9 @@ class PulsarConfig:
     def topic(self, short_name: str) -> str:
         if short_name.startswith("persistent://"):
             return short_name
+
+        if short_name.startswith("content"):
+            return f"persistent://content-management/events/{short_name}"
         return f"persistent://{self.namespace}/{short_name}"
 
 class PulsarEventPublisher:
