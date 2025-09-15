@@ -18,6 +18,9 @@ COPY src/ ./src/
 # Crear directorio para logs
 RUN mkdir -p /app/logs
 
+# Configurar PYTHONPATH para que Python pueda encontrar los módulos
+ENV PYTHONPATH=/app/src
+
 # Exponer puerto
 EXPOSE 5000
 
