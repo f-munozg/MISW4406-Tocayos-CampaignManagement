@@ -1,137 +1,98 @@
-"""Configuración de Pulsar para eventos
-
-En este archivo se define la configuración y utilidades para Pulsar
-
-"""
-
 import os
 import json
 import logging
-from typing import Dict, Any
-from pulsar import Client, Producer, Consumer
-from campaign_management.seedwork.dominio.eventos import EventoDominio
+from typing import Callable, Optional
+from pulsar import Client, ConsumerType, InitialPosition
 
 logger = logging.getLogger(__name__)
 
 class PulsarConfig:
     def __init__(self):
-        self.service_url = os.getenv('PULSAR_SERVICE_URL', 'pulsar://localhost:6650')
-        self.admin_url = os.getenv('PULSAR_ADMIN_URL', 'http://localhost:8080')
-        self.tenant = 'campaign-management'
-        self.namespace = 'events'
-        
-    def get_topic_name(self, event_type: str) -> str:
-        """Genera el nombre del topic basado en el tipo de evento"""
-        return f"persistent://{self.tenant}/{self.namespace}/{event_type}"
+        self.service_url = os.getenv("PULSAR_SERVICE_URL", "pulsar://localhost:6650")
+        self.namespace   = os.getenv("PULSAR_NAMESPACE", "public/default")
+
+    def topic(self, short_name: str) -> str:
+        if short_name.startswith("persistent://"):
+            return short_name
+        return f"persistent://{self.namespace}/{short_name}"
 
 class PulsarEventPublisher:
-    def __init__(self):
-        self.config = PulsarConfig()
-        self.client = None
-        self.producers: Dict[str, Producer] = {}
-        
-    def _get_client(self) -> Client:
-        """Obtiene o crea el cliente de Pulsar"""
-        if self.client is None:
-            self.client = Client(self.config.service_url)
-        return self.client
-    
-    def _get_producer(self, topic_name: str) -> Producer:
-        """Obtiene o crea un producer para el topic especificado"""
-        if topic_name not in self.producers:
-            client = self._get_client()
-            self.producers[topic_name] = client.create_producer(topic_name)
-        return self.producers[topic_name]
-    
-    def publish_event(self, evento: EventoDominio, event_type: str):
-        """Publica un evento en Pulsar"""
-        try:
-            topic_name = self.config.get_topic_name(event_type)
-            producer = self._get_producer(topic_name)
-            
-            # Serializar el evento
-            event_data = self._serialize_event(evento)
-            
-            # Publicar el evento
-            producer.send(event_data.encode('utf-8'))
-            logger.info(f"Evento publicado en {topic_name}: {evento.__class__.__name__}")
-            
-        except Exception as e:
-            logger.error(f"Error publicando evento en Pulsar: {e}")
-            raise
-    
-    def _serialize_event(self, evento: EventoDominio) -> str:
-        """Serializa un evento a JSON"""
-        event_dict = {
-            'event_type': evento.__class__.__name__,
-            'event_data': evento.__dict__,
-            'timestamp': evento.fecha_evento.isoformat() if hasattr(evento, 'fecha_evento') else None
-        }
-        return json.dumps(event_dict, default=str)
-    
+
+    def __init__(self, config: Optional[PulsarConfig] = None):
+        self.cfg = config or PulsarConfig()
+        self._client: Optional[Client] = None
+        self._producers = {}  # topic -> producer
+
+    def _client_get(self) -> Client:
+        if self._client is None:
+            self._client = Client(self.cfg.service_url)
+        return self._client
+
+    def _producer_get(self, topic: str):
+        if topic not in self._producers:
+            client = self._client_get()
+            self._producers[topic] = client.create_producer(topic)
+        return self._producers[topic]
+
+    def publish_raw(self, topic_short: str, key: str, value: bytes):
+        topic = self.cfg.topic(topic_short)
+        prod = self._producer_get(topic)
+        prod.send(value, partition_key=key)
+        logger.debug("Pulsar published topic=%s key=%s bytes=%d", topic, key, len(value))
+
+    def publish_json(self, topic_short: str, key: str, payload: dict):
+        self.publish_raw(topic_short, key, json.dumps(payload).encode("utf-8"))
+
     def close(self):
-        """Cierra todas las conexiones"""
-        for producer in self.producers.values():
-            producer.close()
-        if self.client:
-            self.client.close()
+        try:
+            for p in self._producers.values():
+                p.close()
+            self._producers.clear()
+        finally:
+            if self._client:
+                self._client.close()
+                self._client = None
 
 class PulsarEventConsumer:
-    def __init__(self):
-        self.config = PulsarConfig()
-        self.client = None
-        self.consumers = {}
-        
-    def _get_client(self) -> Client:
-        """Obtiene o crea el cliente de Pulsar"""
-        if self.client is None:
-            self.client = Client(self.config.service_url)
-        return self.client
-    
-    def subscribe_to_topic(self, topic_name: str, subscription_name: str, callback):
-        """Se suscribe a un topic específico"""
-        try:
-            client = self._get_client()
-            consumer = client.subscribe(topic_name, subscription_name)
-            self.consumers[topic_name] = consumer
-            
-            # Procesar mensajes en un hilo separado
-            import threading
-            thread = threading.Thread(target=self._process_messages, args=(consumer, callback))
-            thread.daemon = True
-            thread.start()
-            
-            logger.info(f"Suscrito al topic {topic_name} con subscription {subscription_name}")
-            
-        except Exception as e:
-            logger.error(f"Error suscribiéndose al topic {topic_name}: {e}")
-            raise
-    
-    def _process_messages(self, consumer, callback):
-        """Procesa mensajes del consumer"""
-        try:
-            while True:
-                msg = consumer.receive(timeout_millis=1000)
-                try:
-                    # Deserializar el mensaje
-                    event_data = json.loads(msg.data().decode('utf-8'))
-                    callback(event_data)
-                    consumer.acknowledge(msg)
-                except Exception as e:
-                    logger.error(f"Error procesando mensaje: {e}")
-                    consumer.negative_acknowledge(msg)
-        except Exception as e:
-            logger.error(f"Error en el procesamiento de mensajes: {e}")
-    
+    def __init__(self, config: Optional[PulsarConfig] = None):
+        self.cfg = config or PulsarConfig()
+        self._client: Optional[Client] = None
+        self._consumer = None
+
+    def _client_get(self) -> Client:
+        if self._client is None:
+            self._client = Client(self.cfg.service_url)
+        return self._client
+
+    def subscribe(self, topic_short: str, subscription: str, on_message: Callable[[dict], None]):
+        topic = self.cfg.topic(topic_short)
+        client = self._client_get()
+        self._consumer = client.subscribe(
+            topic,
+            subscription_name=subscription,
+            consumer_type=ConsumerType.Shared,
+            initial_position=InitialPosition.Earliest,
+        )
+        logger.info("Pulsar subscribed topic=%s subscription=%s", topic, subscription)
+
+        while True:
+            msg = self._consumer.receive()
+            try:
+                payload = json.loads(msg.data().decode("utf-8"))
+                on_message(payload)
+                self._consumer.acknowledge(msg)
+            except Exception as e:
+                logger.exception("Error procesando mensaje Pulsar: %s", e)
+                self._consumer.negative_acknowledge(msg)
+
     def close(self):
-        """Cierra todas las conexiones"""
-        for consumer in self.consumers.values():
-            consumer.close()
-        if self.client:
-            self.client.close()
+        if self._consumer:
+            self._consumer.close()
+            self._consumer = None
+        if self._client:
+            self._client.close()
+            self._client = None
 
-# Instancia global del publisher
-pulsar_publisher = PulsarEventPublisher()
-
-# Instancia global del consumer
-pulsar_consumer = PulsarEventConsumer()
+_pcfg = PulsarConfig()
+pulsar_publisher = PulsarEventPublisher(_pcfg)
+pulsar_consumer  = PulsarEventConsumer(_pcfg)

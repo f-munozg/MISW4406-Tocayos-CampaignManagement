@@ -1,50 +1,26 @@
 """Queries para la gestión de campañas
 
 En este archivo se definen las queries para la gestión de campañas
-
 """
 
 from dataclasses import dataclass
-from abc import ABC, abstractmethod
-
-class Query:
-    ...
-
-class QueryHandler(ABC):
-    @abstractmethod
-    def handle(self, query: Query):
-        raise NotImplementedError()
 
 @dataclass
-class ObtenerCampana(Query):
+class ObtenerCampana:
     id_campana: str
 
 @dataclass
-class ObtenerCampanasPorMarca(Query):
+class ObtenerCampanasPorMarca:
     id_marca: str
 
 @dataclass
-class ObtenerCampanasPorTipo(Query):
+class ObtenerCampanasPorTipo:
     tipo_campana: str
 
 @dataclass
-class ObtenerCampanasPorEstado(Query):
+class ObtenerCampanasPorEstado:
     estado: str
 
 @dataclass
-class ObtenerCampanasActivas(Query):
+class ObtenerCampanasActivas:
     pass
-
-@dataclass
-class ObtenerCampanasPorObjetivo(Query):
-    objetivo: str
-
-@dataclass
-class ObtenerCampanasPorRangoFechas(Query):
-    fecha_inicio: str
-    fecha_fin: str
-
-@dataclass
-class ObtenerCampanasPorPresupuesto(Query):
-    presupuesto_minimo: float
-    presupuesto_maximo: float

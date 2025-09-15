@@ -1,71 +1,80 @@
-"""Handler para el comando CrearCampana
-
-En este archivo se define el handler para crear campañas
-
-"""
+import json
+import logging
+from datetime import datetime
 
 from campaign_management.modulos.campaign_management.aplicacion.comandos.comandos_campana import CrearCampana
 from campaign_management.modulos.campaign_management.infraestructura.modelos import CampanaDBModel
-from campaign_management.seedwork.aplicacion.comandos import ejecutar_commando
-from campaign_management.infraestructura.pulsar import pulsar_publisher
 from campaign_management.config.db import db
-from datetime import datetime
-import uuid
-import logging
+from campaign_management.infraestructura.outbox.model import OutboxEvent
 
 logger = logging.getLogger(__name__)
 
-@ejecutar_commando.register
-def _(comando: CrearCampana):
-    """Handler para crear una nueva campaña"""
-    logger.info(f"Ejecutando comando CrearCampana: {comando}")
+def _parse_iso(dt: str):
+    if not dt:
+        return None
     try:
-        # Crear modelo de base de datos directamente
-        campana_model = CampanaDBModel()
-        campana_model.id = uuid.UUID(comando.id)
-        campana_model.id_marca = uuid.UUID(comando.id_marca)
-        campana_model.nombre = comando.nombre
-        campana_model.descripcion = comando.descripcion
-        campana_model.tipo_campana = comando.tipo_campana
-        campana_model.objetivo = comando.objetivo
-        campana_model.estado = 'borrador'
-        campana_model.presupuesto_total = comando.presupuesto_total
-        campana_model.meta_ventas = comando.meta_ventas
-        campana_model.meta_engagement = comando.meta_engagement
-        campana_model.target_audiencia = comando.target_audiencia
-        campana_model.canales_distribucion = comando.canales_distribucion
-        campana_model.terminos_condiciones = comando.terminos_condiciones
-        
-        if comando.fecha_creacion:
-            campana_model.fecha_creacion = datetime.fromisoformat(comando.fecha_creacion)
-        if comando.fecha_actualizacion:
-            campana_model.fecha_actualizacion = datetime.fromisoformat(comando.fecha_actualizacion)
-        
-        # Guardar en base de datos
-        db.session.add(campana_model)
-        db.session.commit()
-        
-        # Crear y publicar evento de dominio
-        from campaign_management.modulos.campaign_management.dominio.entidades import CampanaCreada
-        evento = CampanaCreada(
-            id_campana=campana_model.id,
-            id_marca=campana_model.id_marca,
-            nombre=campana_model.nombre,
-            tipo_campana=campana_model.tipo_campana,
-            objetivo=campana_model.objetivo,
-            fecha_creacion=campana_model.fecha_creacion
+        if dt.endswith('Z'):
+            dt = dt.replace('Z', '+00:00')
+        from datetime import datetime
+        return datetime.fromisoformat(dt)
+    except Exception:
+        return None
+
+def manejar_crear_campana(cmd: CrearCampana):
+    try:
+
+        fi = _parse_iso(cmd.fecha_inicio)
+        ff = _parse_iso(cmd.fecha_fin)
+
+        camp = CampanaDBModel(
+            id_marca          = cmd.id_marca,
+            nombre            = cmd.nombre,
+            descripcion       = cmd.descripcion,
+            tipo_campana      = cmd.tipo_campana,
+            objetivo          = cmd.objetivo,
+            estado            = "borrador",
+            fecha_inicio      = fi,
+            fecha_fin         = ff,
+            presupuesto_total = cmd.presupuesto_total or 0.0,
+            presupuesto_utilizado = 0.0,
+            meta_ventas       = cmd.meta_ventas or 0,
+            ventas_actuales   = 0,
+            meta_engagement   = cmd.meta_engagement or 0,
+            engagement_actual = 0,
+            target_audiencia  = cmd.target_audiencia,
+            canales_distribucion = cmd.canales_distribucion,
         )
-        
-        # Publicar evento en Pulsar (opcional)
-        try:
-            pulsar_publisher.publish_event(evento, 'campaign-events')
-            logger.info(f"Evento publicado en Pulsar para campaña: {campana_model.id}")
-        except Exception as pulsar_error:
-            logger.warning(f"Error publicando evento en Pulsar: {pulsar_error}")
-        
-        logger.info(f"Campaña creada exitosamente: {campana_model.id}")
-        
+        db.session.add(camp)
+        db.session.flush()
+
+        evento = {
+            "event_type": "CampaignCreated",
+            "aggregate_id": str(camp.id),
+            "version": 1,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {
+                "id": str(camp.id),
+                "id_marca": str(camp.id_marca),
+                "nombre": camp.nombre,
+                "tipo_campana": camp.tipo_campana,
+                "fecha_inicio": camp.fecha_inicio.isoformat() if camp.fecha_inicio else None,
+                "fecha_fin": camp.fecha_fin.isoformat() if camp.fecha_fin else None
+            },
+            "metadata": {}
+        }
+
+        out = OutboxEvent(
+            aggregate_id=camp.id,
+            aggregate_type="Campaign",
+            event_type="CampaignCreated",
+            payload=json.dumps(evento)
+        )
+        db.session.add(out)
+        db.session.commit()
+        logger.info("Campaña creada %s y evento almacenado en outbox %s", camp.id, out.id)
+        return str(camp.id)
+
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Error creando campaña: {e}")
+        logger.exception("Error creando campaña: %s", e)
         raise
