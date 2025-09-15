@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+from flask import current_app
 
 from campaign_management.config.db import db
 from campaign_management.infraestructura.pulsar import pulsar_consumer
@@ -11,21 +12,26 @@ TOPIC_CAMPAIGN = "campaign-events"
 SUBSCRIPTION  = "campaigns-read-projection"
 
 class EventConsumerService:
+    def __init__(self, app=None):
+        self.app = app
+    
     def start_consuming(self):
         pulsar_consumer.subscribe(TOPIC_CAMPAIGN, SUBSCRIPTION, self._on_message)
 
     def _on_message(self, payload: dict):
-        et = payload.get("event_type")
-        if et == "CampaignCreated":
-            self._apply_campaign_created(payload)
-        elif et == "CampaignActivated":
-            self._apply_campaign_status_change(payload, "activa")
-        elif et == "CampaignPaused":
-            self._apply_campaign_status_change(payload, "pausada")
-        elif et == "CampaignFinalized":
-            self._apply_campaign_status_change(payload, "finalizada")
-        else:
-            logger.info("Evento ignorado: %s", et)
+        # Use Flask application context when processing messages
+        with self.app.app_context():
+            et = payload.get("event_type")
+            if et == "CampaignCreated":
+                self._apply_campaign_created(payload)
+            elif et == "CampaignActivated":
+                self._apply_campaign_status_change(payload, "activa")
+            elif et == "CampaignPaused":
+                self._apply_campaign_status_change(payload, "pausada")
+            elif et == "CampaignFinalized":
+                self._apply_campaign_status_change(payload, "finalizada")
+            else:
+                logger.info("Evento ignorado: %s", et)
 
     def _apply_campaign_created(self, ev: dict):
         data = ev.get("data", {})
