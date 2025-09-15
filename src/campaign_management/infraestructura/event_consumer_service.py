@@ -49,7 +49,7 @@ class EventConsumerService:
                     return
                 # si existe pero con menor versión (poco probable al crear), actualizar campos básicos
                 existing.nombre = data.get("nombre") or existing.nombre
-                existing.tipo_campana = data.get("tipo_campana") or existing.tipo_campana
+                existing.tipo_campana = data.get("tipo") or existing.tipo_campana
                 existing.fecha_inicio = self._parse_iso(data.get("fecha_inicio")) or existing.fecha_inicio
                 existing.fecha_fin = self._parse_iso(data.get("fecha_fin")) or existing.fecha_fin
                 existing.last_version = version
@@ -61,7 +61,7 @@ class EventConsumerService:
                 id=aggregate_id,
                 id_marca=data.get("id_marca"),
                 nombre=data.get("nombre"),
-                tipo_campana=data.get("tipo_campana"),
+                tipo_campana=data.get("tipo"),
                 estado="borrador",
                 fecha_inicio=self._parse_iso(data.get("fecha_inicio")),
                 fecha_fin=self._parse_iso(data.get("fecha_fin")),
@@ -74,6 +74,12 @@ class EventConsumerService:
                 last_version=version,
                 fecha_ultima_actividad=datetime.utcnow()
             )
+            if row.id_marca is None:
+                row.id_marca = uuid.uuid4()
+
+            if row.nombre is None:
+                row.nombre = ""
+            
             db.session.add(row)
 
     def _apply_campaign_status_change(self, ev: dict, new_status: str):
