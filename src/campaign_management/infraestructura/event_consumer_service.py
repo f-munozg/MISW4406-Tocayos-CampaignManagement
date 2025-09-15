@@ -79,6 +79,9 @@ class EventConsumerService:
 
             if row.nombre is None:
                 row.nombre = ""
+
+            if row.tipo_campana is None:
+                row.tipo_campana = ""
             
             db.session.add(row)
 
