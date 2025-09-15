@@ -108,10 +108,6 @@ def activar_campana(id):
         logger.info("Campaña no encontrada: %s", id)
         return jsonify({"error": "campaña no encontrada", "id": id}), 404
 
-    except ExcepcionDominio as e:
-        # define/usa tu excepción de dominio para transiciones inválidas
-        return jsonify({"error": "transición inválida", "detail": str(e)}), 409
-
     except Exception as e:
         logger.exception("Error activando campaña %s", id)
         return jsonify({"error": "internal", "detail": str(e)}), 500

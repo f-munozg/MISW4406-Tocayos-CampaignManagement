@@ -34,6 +34,26 @@ services:
       timeout: 5s
       retries: 10
 
+  # pulsar-init:
+  #     image: apachepulsar/pulsar:3.1.0
+  #     depends_on:
+  #       - pulsar
+  #     volumes:
+  #       - ./scripts/init-pulsar.sh:/init-pulsar.sh
+  #     command: ["sh", "/init-pulsar.sh"]
+
+  pulsar-init:
+    image: apachepulsar/pulsar:4.1.0
+    depends_on:
+      pulsar:
+        condition: service_healthy
+    environment:
+      PULSAR_ADMIN_URL: http://pulsar:8080
+    volumes:
+      - ./scripts/init-pulsar.sh:/init-pulsar.sh:ro
+    command: ["sh", "/init-pulsar.sh"]
+
+
   app:
     build:
       context: .
@@ -47,7 +67,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/appdb
       PULSAR_SERVICE_URL: pulsar://pulsar:6650
-      PULSAR_NAMESPACE: public/default
+      PULSAR_NAMESPACE: campaign-management/events
       FLASK_ENV: production
       PYTHONPATH: /app/src
     volumes:
@@ -73,7 +93,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/appdb
       PULSAR_SERVICE_URL: pulsar://pulsar:6650
-      PULSAR_NAMESPACE: public/default
+      PULSAR_NAMESPACE: campaign-management/events
       PYTHONPATH: /app/src
     volumes:
       - ./src:/app/src:ro
@@ -111,6 +131,8 @@ services:
       python -m campaign_management.infraestructura.outbox.dispatcher
       "
     restart: unless-stopped
+
+
 
 volumes:
   pg_data:

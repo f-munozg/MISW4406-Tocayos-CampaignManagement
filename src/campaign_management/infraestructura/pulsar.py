@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 class PulsarConfig:
     def __init__(self):
         self.service_url = os.getenv("PULSAR_SERVICE_URL", "pulsar://localhost:6650")
-        self.namespace   = os.getenv("PULSAR_NAMESPACE", "public/default")
+        self.namespace   = os.getenv("PULSAR_NAMESPACE", "campaign-management/events")
 
     def topic(self, short_name: str) -> str:
         if short_name.startswith("persistent://"):
