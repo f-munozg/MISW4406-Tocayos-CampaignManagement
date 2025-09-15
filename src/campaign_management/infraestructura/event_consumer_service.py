@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime
 from flask import current_app
+import uuid
 
 from campaign_management.config.db import db
 from campaign_management.infraestructura.pulsar import pulsar_consumer
@@ -36,6 +37,8 @@ class EventConsumerService:
     def _apply_campaign_created(self, ev: dict):
         data = ev.get("data", {})
         aggregate_id = data.get("id")
+        if aggregate_id is None:
+            aggregate_id = uuid.uuid4()
         version = int(ev.get("version", 1))
 
         with db.session.begin():
