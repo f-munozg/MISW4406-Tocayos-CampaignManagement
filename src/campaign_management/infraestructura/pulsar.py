@@ -8,7 +8,7 @@ import os
 import json
 import logging
 from typing import Dict, Any
-from pulsar import Client, Producer, Consumer
+from pulsar import Client, Producer, Consumer, SubscriptionType
 from campaign_management.seedwork.dominio.eventos import EventoDominio
 
 logger = logging.getLogger(__name__)
@@ -113,7 +113,7 @@ class PulsarEventConsumer:
         """Se suscribe a un topic específico"""
         try:
             client = self._get_client()
-            consumer = client.subscribe(topic_name, subscription_name)
+            consumer = client.subscribe(topic=topic_name, subscription_name=subscription_name,  subscription_type=SubscriptionType.Shared)
             self.consumers[topic_name] = consumer
             
             # Procesar mensajes en un hilo separado
