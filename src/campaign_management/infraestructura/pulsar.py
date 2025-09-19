@@ -78,6 +78,42 @@ class PulsarEventPublisher:
             logger.error(f"Error publicando evento en Pulsar: {e}")
             raise
     
+    def publish_json(self, topic_name: str, key: str = None, payload: dict = None):
+        """Publica un payload JSON en Pulsar"""
+        try:
+            producer = self._get_producer(topic_name)
+            
+            # Serializar el payload a JSON
+            if payload is None:
+                payload = {}
+            
+            json_data = json.dumps(payload, default=str)
+            
+            # Crear el mensaje con key si se proporciona
+            message = json_data.encode('utf-8')
+            
+            if key:
+                producer.send(message, partition_key=key)
+                logger.info(f"JSON publicado en {topic_name} con key {key}")
+            else:
+                producer.send(message)
+                logger.info(f"JSON publicado en {topic_name}")
+            
+        except Exception as e:
+            logger.error(f"Error publicando JSON en Pulsar: {e}")
+            raise
+    
+    def close(self):
+        """Cierra todas las conexiones del publisher"""
+        try:
+            for producer in self.producers.values():
+                producer.close()
+            if self.client:
+                self.client.close()
+            logger.info("Pulsar publisher connections closed")
+        except Exception as e:
+            logger.error(f"Error cerrando conexiones del publisher: {e}")
+    
     def _serialize_event(self, evento: EventoDominio) -> str:
         """Serializa un evento a JSON"""
         event_dict = {
