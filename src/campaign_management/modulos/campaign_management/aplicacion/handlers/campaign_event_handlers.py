@@ -26,7 +26,13 @@ class CampaignCreatedEventHandler(EventHandler):
                 logger.info(f"CampaignCreated event data: {event_data}")
                 return
                 
+            # Handle different event data structures
             data = event_data.get("data", {})
+            if not data:
+                data = event_data.get("event_data", {})
+            if not data:
+                data = event_data  # fallback to the whole event_data
+            
             aggregate_id = data.get("id")
             if aggregate_id is None:
                 aggregate_id = uuid.uuid4()
@@ -38,16 +44,16 @@ class CampaignCreatedEventHandler(EventHandler):
                 return
             
             # Create campaign entity (this would be done through a factory or builder)
-            # For now, we'll assume the event data contains all necessary information
+            # Handle different event data structures (loyalty vs campaign events)
             campaign_data = {
                 "id": aggregate_id,
-                "id_marca": data.get("id_marca"),
-                "nombre": data.get("nombre"),
-                "tipo_campana": data.get("tipo_campana"),
+                "id_marca": data.get("id_marca") or data.get("marca") or uuid.uuid4(),
+                "nombre": data.get("nombre") or data.get("categoria", "Campaign"),
+                "tipo_campana": data.get("tipo_campana") or data.get("tipo", "lealtad"),
                 "objetivo": data.get("objetivo", "ventas"),
                 "estado": "borrador",
-                "fecha_inicio": self._parse_iso(data.get("fecha_inicio")),
-                "fecha_fin": self._parse_iso(data.get("fecha_fin")),
+                "fecha_inicio": self._parse_iso(data.get("fecha_inicio") or data.get("inicio_campania")),
+                "fecha_fin": self._parse_iso(data.get("fecha_fin") or data.get("final_campania")),
                 "presupuesto_total": 0.0,
                 "presupuesto_utilizado": 0.0,
                 "meta_ventas": 0,

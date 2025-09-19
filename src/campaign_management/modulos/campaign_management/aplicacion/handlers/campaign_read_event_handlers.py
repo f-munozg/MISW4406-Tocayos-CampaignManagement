@@ -74,14 +74,15 @@ class CampaignReadEventHandler(EventHandler):
             return
         
         # Create new read model
+        # Handle different event data structures (loyalty vs campaign events)
         read_model_data = {
             "id": aggregate_id,
-            "id_marca": data.get("id_marca"),
-            "nombre": data.get("nombre"),
-            "tipo_campana": data.get("tipo_campana"),
+            "id_marca": data.get("id_marca") or data.get("marca") or uuid.uuid4(),
+            "nombre": data.get("nombre") or data.get("categoria", "Campaign"),
+            "tipo_campana": data.get("tipo_campana") or data.get("tipo", "lealtad"),
             "estado": "borrador",
-            "fecha_inicio": self._parse_iso(data.get("fecha_inicio")),
-            "fecha_fin": self._parse_iso(data.get("fecha_fin")),
+            "fecha_inicio": self._parse_iso(data.get("fecha_inicio") or data.get("inicio_campania")),
+            "fecha_fin": self._parse_iso(data.get("fecha_fin") or data.get("final_campania")),
             "presupuesto_total": 0.0,
             "presupuesto_utilizado": 0.0,
             "meta_ventas": 0,

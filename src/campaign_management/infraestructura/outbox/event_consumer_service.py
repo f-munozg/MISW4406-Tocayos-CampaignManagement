@@ -24,11 +24,12 @@ TOPIC_CAMPAIGN = "campaign-events"
 SUBSCRIPTION  = "campaign-projection"
 
 class EventConsumerService:
-    def __init__(self, use_new_handlers: bool = False):
+    def __init__(self, use_new_handlers: bool = False, app=None):
         self.config = PulsarConfig()
         self.consumer = PulsarEventConsumer()
         self.running = False
         self.use_new_handlers = use_new_handlers and NEW_HANDLERS_AVAILABLE
+        self.app = app  # Store Flask app reference
         
         if self.use_new_handlers:
             logger.info("Using new event handlers")
@@ -77,7 +78,23 @@ class EventConsumerService:
             
             # Use new handlers if available and enabled
             if self.use_new_handlers:
-                EventHandlerFactory.handle_event(payload)
+                # Ensure we're in a Flask app context when using new handlers
+                if self.app:
+                    with self.app.app_context():
+                        EventHandlerFactory.handle_event(payload)
+                else:
+                    logger.warning("No Flask app context available for new handlers, falling back to legacy")
+                    # Fall back to legacy handlers
+                    if et == "CampaignCreated":
+                        self._apply_campaign_created(payload)
+                    elif et == "CampaignActivated":
+                        self._apply_campaign_status_change(payload, "activa")
+                    elif et == "CampaignPaused":
+                        self._apply_campaign_status_change(payload, "pausada")
+                    elif et == "CampaignFinalized":
+                        self._apply_campaign_status_change(payload, "finalizada")
+                    else:
+                        logger.info("Evento ignorado: %s", et)
             else:
                 # Use legacy handlers
                 if et == "CampaignCreated":
@@ -228,5 +245,12 @@ class EventConsumerService:
         except Exception:
             return None
 
-# singleton - enable new handlers by default
-event_consumer_service = EventConsumerService(use_new_handlers=True)
+# singleton - will be created with Flask app context
+event_consumer_service = None
+
+def create_event_consumer_service(app, use_new_handlers=True):
+    """Create the event consumer service with Flask app context"""
+    global event_consumer_service
+    if event_consumer_service is None:
+        event_consumer_service = EventConsumerService(use_new_handlers=use_new_handlers, app=app)
+    return event_consumer_service

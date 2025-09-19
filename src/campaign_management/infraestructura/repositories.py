@@ -295,6 +295,28 @@ class SQLAlchemyCampaignReadRepository(CampaignReadRepository):
             logger.error(f"Error getting all campaign read models: {e}")
             raise
     
+    def get_by_marca(self, marca_id: uuid.UUID) -> List[Dict[str, Any]]:
+        """Get campaigns by marca ID"""
+        try:
+            campaigns = self.session.query(CampanaReadDBModel).filter(
+                CampanaReadDBModel.id_marca == marca_id
+            ).all()
+            return [self._model_to_dict(campaign) for campaign in campaigns]
+        except Exception as e:
+            logger.error(f"Error getting campaigns by marca {marca_id}: {e}")
+            raise
+    
+    def get_by_estado(self, estado: str) -> List[Dict[str, Any]]:
+        """Get campaigns by estado"""
+        try:
+            campaigns = self.session.query(CampanaReadDBModel).filter(
+                CampanaReadDBModel.estado == estado
+            ).all()
+            return [self._model_to_dict(campaign) for campaign in campaigns]
+        except Exception as e:
+            logger.error(f"Error getting campaigns by estado {estado}: {e}")
+            raise
+    
     def _model_to_dict(self, campaign: CampanaReadDBModel) -> Dict[str, Any]:
         """Convert model to dictionary"""
         return {
