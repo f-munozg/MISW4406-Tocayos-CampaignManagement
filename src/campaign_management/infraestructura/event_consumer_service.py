@@ -19,6 +19,7 @@ class EventConsumerService:
         self.config = PulsarConfig()
         self.consumers = {}
         self.running = False
+        self.app = app
     
     def start_consuming(self):
         """Inicia el consumo de eventos para todos los módulos"""
@@ -50,25 +51,39 @@ class EventConsumerService:
 
     def _on_message(self, event_data: Dict[str, Any]):
         try:
-            event_type = event_data.get('event_type')
-            event_payload = event_data.get('event_data', {})
-            
-            logger.info(f"Procesando evento de campañas: {event_type}")
-            
-            # Aquí se pueden agregar lógicas específicas para cada tipo de evento
-            if event_type == 'CampaignCreated':
-                self._apply_campaign_created(event_payload)
-            elif event_type == 'CampaignActivated':
-               self._apply_campaign_status_change(event_payload, "activa")
-            elif event_type == 'CampaignPaused':
-                self._apply_campaign_status_change(event_payload, "pausada")
-            elif event_type == 'CampaignFinalized':
-                self._apply_campaign_status_change(event_payload, "finalizada")
+            # Ensure we have Flask application context
+            if self.app:
+                with self.app.app_context():
+                    self._process_event(event_data)
             else:
-                logger.info("Evento ignorado: %s", event_type)
-                
+                # Fallback: try to get current app context
+                try:
+                    with current_app.app_context():
+                        self._process_event(event_data)
+                except RuntimeError:
+                    logger.error("No Flask application context available for event processing")
+                    return
         except Exception as e:
             logger.error(f"Error procesando evento de programa de lealtad: {e}")
+
+    def _process_event(self, event_data: Dict[str, Any]):
+        """Process the event within Flask application context"""
+        event_type = event_data.get('event_type')
+        event_payload = event_data.get('event_data', {})
+        
+        logger.info(f"Procesando evento de campañas: {event_type}")
+        
+        # Aquí se pueden agregar lógicas específicas para cada tipo de evento
+        if event_type == 'CampaignCreated':
+            self._apply_campaign_created(event_payload)
+        elif event_type == 'CampaignActivated':
+           self._apply_campaign_status_change(event_payload, "activa")
+        elif event_type == 'CampaignPaused':
+            self._apply_campaign_status_change(event_payload, "pausada")
+        elif event_type == 'CampaignFinalized':
+            self._apply_campaign_status_change(event_payload, "finalizada")
+        else:
+            logger.info("Evento ignorado: %s", event_type)
 
     def _apply_campaign_created(self, ev: dict):
         data = ev.get("data", {})

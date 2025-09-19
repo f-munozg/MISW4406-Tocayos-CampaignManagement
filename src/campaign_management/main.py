@@ -90,11 +90,12 @@ def create_app():
     
     # Inicializar servicios de Pulsar (opcional)
     try:
-        from campaign_management.infraestructura.event_consumer_service import event_consumer_service
+        from campaign_management.infraestructura.event_consumer_service import EventConsumerService
         from campaign_management.infraestructura.pulsar import pulsar_publisher
         import atexit
         
-        # Iniciar el servicio de consumo de eventos
+        # Crear e inicializar el servicio de consumo de eventos con la app
+        event_consumer_service = EventConsumerService(app)
         event_consumer_service.start_consuming()
         logger.info("Servicio de consumo de eventos iniciado")
         
@@ -109,11 +110,9 @@ def create_app():
 def cleanup_pulsar_connections():
     """Limpia las conexiones de Pulsar al cerrar la aplicación"""
     try:
-        from campaign_management.infraestructura.event_consumer_service import event_consumer_service
         from campaign_management.infraestructura.pulsar import pulsar_publisher
         # Note: The event_consumer_service instance is local to create_app()
         # The Pulsar consumer will be cleaned up when the process exits
-        event_consumer_service.stop_consuming()
         pulsar_publisher.close()
         logger.info("Conexiones de Pulsar cerradas correctamente")
     except Exception as e:
