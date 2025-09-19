@@ -83,7 +83,7 @@ services:
   campaigns-projection-consumer:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile-projections
     container_name: cm-projection-consumer
     depends_on:
       postgres:
@@ -97,22 +97,12 @@ services:
       PYTHONPATH: /app/src
     volumes:
       - ./src:/app/src:ro
-    command: |
-      bash -lc '
-      python - <<'"'"'PY'"'"'
-      from campaign_management.main import create_app
-      from campaign_management.infraestructura.event_consumer_service import event_consumer_service
-      app = create_app()
-      with app.app_context():
-          event_consumer_service.start_consuming()
-      PY
-      '
     restart: unless-stopped
 
   outbox-dispatcher:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile-outbox
     container_name: cm-outbox-dispatcher
     depends_on:
       postgres:
@@ -126,10 +116,6 @@ services:
       PYTHONPATH: /app/src
     volumes:
       - ./src:/app/src:ro
-    command: >
-      bash -lc "
-      python -m campaign_management.infraestructura.outbox.dispatcher
-      "
     restart: unless-stopped
 
 
