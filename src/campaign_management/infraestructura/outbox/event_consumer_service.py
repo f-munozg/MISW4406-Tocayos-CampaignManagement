@@ -11,16 +11,29 @@ from campaign_management.config.db import db
 from campaign_management.infraestructura.pulsar import PulsarEventConsumer, PulsarConfig
 from campaign_management.modulos.campaign_management.infraestructura.modelos_read import CampanaReadDBModel
 
+# Import new event handlers (optional)
+try:
+    from campaign_management.modulos.campaign_management.aplicacion.handlers.event_handler_factory import EventHandlerFactory
+    NEW_HANDLERS_AVAILABLE = True
+except ImportError:
+    NEW_HANDLERS_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 TOPIC_CAMPAIGN = "campaign-events"
 SUBSCRIPTION  = "campaign-projection"
 
 class EventConsumerService:
-    def __init__(self):
+    def __init__(self, use_new_handlers: bool = False):
         self.config = PulsarConfig()
         self.consumer = PulsarEventConsumer()
         self.running = False
+        self.use_new_handlers = use_new_handlers and NEW_HANDLERS_AVAILABLE
+        
+        if self.use_new_handlers:
+            logger.info("Using new event handlers")
+        else:
+            logger.info("Using legacy event handlers")
     
     def start_consuming(self):
         """Start consuming events with proper error handling"""
@@ -60,17 +73,23 @@ class EventConsumerService:
                 
             et = payload.get("event_type")
             logger.info(f"Processing event: {et}")
+            logger.info(f"Full payload structure: {payload}")
             
-            if et == "CampaignCreated":
-                self._apply_campaign_created(payload)
-            elif et == "CampaignActivated":
-                self._apply_campaign_status_change(payload, "activa")
-            elif et == "CampaignPaused":
-                self._apply_campaign_status_change(payload, "pausada")
-            elif et == "CampaignFinalized":
-                self._apply_campaign_status_change(payload, "finalizada")
+            # Use new handlers if available and enabled
+            if self.use_new_handlers:
+                EventHandlerFactory.handle_event(payload)
             else:
-                logger.info("Evento ignorado: %s", et)
+                # Use legacy handlers
+                if et == "CampaignCreated":
+                    self._apply_campaign_created(payload)
+                elif et == "CampaignActivated":
+                    self._apply_campaign_status_change(payload, "activa")
+                elif et == "CampaignPaused":
+                    self._apply_campaign_status_change(payload, "pausada")
+                elif et == "CampaignFinalized":
+                    self._apply_campaign_status_change(payload, "finalizada")
+                else:
+                    logger.info("Evento ignorado: %s", et)
                 
         except Exception as e:
             logger.error(f"Error processing message: {e}")
@@ -81,12 +100,34 @@ class EventConsumerService:
     def _apply_campaign_created(self, ev: dict):
         """Apply CampaignCreated event to read model with error handling"""
         try:
+            logger.info(f"Processing CampaignCreated event: {ev}")
+            
+            # Try multiple ways to get the campaign ID
+            aggregate_id = None
+            
+            # Method 1: From data.id (expected structure)
             data = ev.get("data", {})
-            aggregate_id = data.get("id")
+            if data and data.get("id"):
+                aggregate_id = data.get("id")
+                logger.info(f"Found campaign ID in data.id: {aggregate_id}")
+            
+            # Method 2: From aggregate_id (alternative structure)
+            if not aggregate_id and ev.get("aggregate_id"):
+                aggregate_id = ev.get("aggregate_id")
+                logger.info(f"Found campaign ID in aggregate_id: {aggregate_id}")
+            
+            # Method 3: From event_data.id (direct structure)
+            if not aggregate_id and ev.get("id"):
+                aggregate_id = ev.get("id")
+                logger.info(f"Found campaign ID in event.id: {aggregate_id}")
+            
             version = int(ev.get("version", 1))
 
             if not aggregate_id:
                 logger.warning("Campaign ID not found in event data")
+                logger.warning(f"Available keys in event: {list(ev.keys())}")
+                if data:
+                    logger.warning(f"Available keys in data: {list(data.keys())}")
                 return
 
             with db.session.begin():
@@ -187,5 +228,5 @@ class EventConsumerService:
         except Exception:
             return None
 
-# singleton
-event_consumer_service = EventConsumerService()
+# singleton - enable new handlers by default
+event_consumer_service = EventConsumerService(use_new_handlers=True)
