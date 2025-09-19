@@ -14,13 +14,18 @@ logger = logging.getLogger(__name__)
 class CampaignCreatedEventHandler(EventHandler):
     """Handles CampaignCreated events"""
     
-    def __init__(self, campaign_repository: CampaignRepository, outbox_repository: OutboxRepository):
+    def __init__(self, campaign_repository: CampaignRepository = None, outbox_repository: OutboxRepository = None):
         self.campaign_repository = campaign_repository
         self.outbox_repository = outbox_repository
     
     def handle(self, event_data: Dict[str, Any]) -> None:
         """Handle CampaignCreated event"""
         try:
+            if not self.campaign_repository or not self.outbox_repository:
+                logger.warning("Repositories not available - event will be logged only")
+                logger.info(f"CampaignCreated event data: {event_data}")
+                return
+                
             data = event_data.get("data", {})
             aggregate_id = data.get("id")
             if aggregate_id is None:
@@ -83,13 +88,18 @@ class CampaignCreatedEventHandler(EventHandler):
 class CampaignStatusChangedEventHandler(EventHandler):
     """Handles campaign status change events"""
     
-    def __init__(self, campaign_repository: CampaignRepository, outbox_repository: OutboxRepository):
+    def __init__(self, campaign_repository: CampaignRepository = None, outbox_repository: OutboxRepository = None):
         self.campaign_repository = campaign_repository
         self.outbox_repository = outbox_repository
     
     def handle(self, event_data: Dict[str, Any]) -> None:
         """Handle campaign status change event"""
         try:
+            if not self.campaign_repository or not self.outbox_repository:
+                logger.warning("Repositories not available - event will be logged only")
+                logger.info(f"Campaign status change event data: {event_data}")
+                return
+                
             aggregate_id = event_data.get("aggregate_id")
             new_status = self._get_new_status(event_data.get("event_type"))
             
@@ -104,9 +114,11 @@ class CampaignStatusChangedEventHandler(EventHandler):
                 return
             
             # Update campaign status
-            campaign["estado"] = new_status
-            campaign["fecha_ultima_actividad"] = datetime.utcnow()
-            self.campaign_repository.update(campaign)
+            updates = {
+                "estado": new_status,
+                "fecha_ultima_actividad": datetime.utcnow()
+            }
+            self.campaign_repository.update(aggregate_id, updates)
             
             # Save to outbox for event publishing
             outbox_event = {

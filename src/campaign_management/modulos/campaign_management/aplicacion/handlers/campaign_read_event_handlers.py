@@ -13,12 +13,17 @@ logger = logging.getLogger(__name__)
 class CampaignReadEventHandler(EventHandler):
     """Handles events for campaign read model projections"""
     
-    def __init__(self, campaign_read_repository: CampaignReadRepository):
+    def __init__(self, campaign_read_repository: CampaignReadRepository = None):
         self.campaign_read_repository = campaign_read_repository
     
     def handle(self, event_data: Dict[str, Any]) -> None:
         """Handle campaign events for read model"""
         try:
+            if not self.campaign_read_repository:
+                logger.warning("CampaignReadRepository not available - event will be logged only")
+                logger.info(f"Event data: {event_data}")
+                return
+                
             event_type = event_data.get("event_type")
             
             if event_type == "CampaignCreated":
@@ -34,7 +39,13 @@ class CampaignReadEventHandler(EventHandler):
     
     def _handle_campaign_created(self, event_data: Dict[str, Any]) -> None:
         """Handle CampaignCreated event for read model"""
-        data = event_data.get("event_data", {})
+        # Try multiple ways to get the data structure
+        data = event_data.get("data", {})
+        if not data:
+            data = event_data.get("event_data", {})
+        if not data:
+            data = event_data  # fallback to the whole event_data
+        
         aggregate_id = data.get("id")
         version = int(event_data.get("version", 1))
         
@@ -51,15 +62,15 @@ class CampaignReadEventHandler(EventHandler):
                 return
             
             # Update existing read model
-            existing.update({
+            updates = {
                 "nombre": data.get("nombre") or existing.get("nombre"),
                 "tipo_campana": data.get("tipo_campana") or existing.get("tipo_campana"),
                 "fecha_inicio": self._parse_iso(data.get("fecha_inicio")) or existing.get("fecha_inicio"),
                 "fecha_fin": self._parse_iso(data.get("fecha_fin")) or existing.get("fecha_fin"),
                 "last_version": version,
                 "fecha_ultima_actividad": datetime.utcnow()
-            })
-            self.campaign_read_repository.update(existing)
+            }
+            self.campaign_read_repository.update(aggregate_id, updates)
             return
         
         # Create new read model
@@ -114,13 +125,13 @@ class CampaignReadEventHandler(EventHandler):
             return
         
         # Update read model
-        read_model.update({
+        updates = {
             "estado": new_status,
             "last_version": version,
             "fecha_ultima_actividad": datetime.utcnow()
-        })
+        }
         
-        self.campaign_read_repository.update(read_model)
+        self.campaign_read_repository.update(aggregate_id, updates)
         logger.info(f"Campaign {aggregate_id} read model status updated to {new_status}")
     
     def _get_new_status(self, event_type: str) -> str:
