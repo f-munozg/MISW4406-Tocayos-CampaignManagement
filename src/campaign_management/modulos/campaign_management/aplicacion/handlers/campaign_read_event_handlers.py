@@ -34,7 +34,7 @@ class CampaignReadEventHandler(EventHandler):
     
     def _handle_campaign_created(self, event_data: Dict[str, Any]) -> None:
         """Handle CampaignCreated event for read model"""
-        data = event_data.get("data", {})
+        data = event_data.get("event_data", {})
         aggregate_id = data.get("id")
         version = int(event_data.get("version", 1))
         
