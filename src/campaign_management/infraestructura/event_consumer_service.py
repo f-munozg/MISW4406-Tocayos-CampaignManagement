@@ -1,38 +1,74 @@
 import logging
 from datetime import datetime
 from flask import current_app
+from typing import Dict, Any
+
 import uuid
 
 from campaign_management.config.db import db
-from campaign_management.infraestructura.pulsar import pulsar_consumer
+from campaign_management.infraestructura.pulsar import PulsarEventConsumer, PulsarConfig
 from campaign_management.modulos.campaign_management.infraestructura.modelos_read import CampanaReadDBModel
 
 logger = logging.getLogger(__name__)
 
-TOPIC_CAMPAIGN = "campaign-events"
-SUBSCRIPTION  = "campaigns-read-projection"
+# TOPIC_CAMPAIGN = "campaign-events"
+# SUBSCRIPTION  = "campaigns-read-projection"
 
 class EventConsumerService:
     def __init__(self, app=None):
-        self.app = app
+        self.config = PulsarConfig()
+        self.consumers = {}
+        self.running = False
     
     def start_consuming(self):
-        pulsar_consumer.subscribe(TOPIC_CAMPAIGN, SUBSCRIPTION, self._on_message)
+        """Inicia el consumo de eventos para todos los módulos"""
+        self.running = True
+        
+        # Eventos de programas de lealtad
+        self._start_consumer('campaign-events', self._on_message)
+        
+        logger.info("Servicio de consumo de eventos iniciado")
 
-    def _on_message(self, payload: dict):
-        # Use Flask application context when processing messages
-        with self.app.app_context():
-            et = payload.get("event_type")
-            if et == "CampaignCreated":
-                self._apply_campaign_created(payload)
-            elif et == "CampaignActivated":
-                self._apply_campaign_status_change(payload, "activa")
-            elif et == "CampaignPaused":
-                self._apply_campaign_status_change(payload, "pausada")
-            elif et == "CampaignFinalized":
-                self._apply_campaign_status_change(payload, "finalizada")
+    def stop_consuming(self):
+        """Detiene el consumo de eventos"""
+        self.running = False
+        for consumer in self.consumers.values():
+            consumer.close()
+        logger.info("Servicio de consumo de eventos detenido")
+
+    def _start_consumer(self, event_type: str, handler):
+        """Inicia un consumidor para un tipo específico de evento"""
+        try:
+            consumer = PulsarEventConsumer()
+            topic_name = self.config.get_topic_name(event_type)
+            subscription_name = f"{event_type}-subscription"
+            consumer.subscribe_to_topic(topic_name, subscription_name, handler)
+            self.consumers[event_type] = consumer
+            logger.info(f"Consumidor iniciado para {event_type}")
+        except Exception as e:
+            logger.error(f"Error iniciando consumidor para {event_type}: {e}")
+
+    def _on_message(self, event_data: Dict[str, Any]):
+        try:
+            event_type = event_data.get('event_type')
+            event_payload = event_data.get('event_data', {})
+            
+            logger.info(f"Procesando evento de campañas: {event_type}")
+            
+            # Aquí se pueden agregar lógicas específicas para cada tipo de evento
+            if event_type == 'CampaignCreated':
+                self._apply_campaign_created(event_payload)
+            elif event_type == 'CampaignActivated':
+               self._apply_campaign_status_change(event_payload, "activa")
+            elif event_type == 'CampaignPaused':
+                self._apply_campaign_status_change(event_payload, "pausada")
+            elif event_type == 'CampaignFinalized':
+                self._apply_campaign_status_change(event_payload, "finalizada")
             else:
-                logger.info("Evento ignorado: %s", et)
+                logger.info("Evento ignorado: %s", event_type)
+                
+        except Exception as e:
+            logger.error(f"Error procesando evento de programa de lealtad: {e}")
 
     def _apply_campaign_created(self, ev: dict):
         data = ev.get("data", {})
