@@ -38,7 +38,7 @@ class SQLAlchemyCampaignRepository(CampaignRepository):
         try:
             campaign = self._dict_to_model(campaign_data)
             self.session.add(campaign)
-            self.session.flush()  # Flush to get the ID
+            self.session.commit()  # Commit to database
             logger.info(f"Campaign {campaign.id} saved successfully")
         except Exception as e:
             logger.error(f"Error saving campaign: {e}")
@@ -58,6 +58,7 @@ class SQLAlchemyCampaignRepository(CampaignRepository):
             
             campaign.fecha_actualizacion = datetime.utcnow()
             self.session.add(campaign)
+            self.session.commit()  # Commit to database
             logger.info(f"Campaign {campaign_id} updated successfully")
         except Exception as e:
             logger.error(f"Error updating campaign {campaign_id}: {e}")
@@ -70,6 +71,7 @@ class SQLAlchemyCampaignRepository(CampaignRepository):
             campaign = self.session.get(CampanaDBModel, campaign_id)
             if campaign:
                 self.session.delete(campaign)
+                self.session.commit()  # Commit to database
                 logger.info(f"Campaign {campaign_id} deleted successfully")
             else:
                 logger.warning(f"Campaign {campaign_id} not found for deletion")
@@ -148,7 +150,7 @@ class SQLAlchemyOutboxRepository(OutboxRepository):
         try:
             outbox_event = self._dict_to_model(outbox_data)
             self.session.add(outbox_event)
-            self.session.flush()  # Flush to get the ID
+            self.session.commit()  # Commit to database
             logger.info(f"Outbox event {outbox_event.id} saved successfully")
         except Exception as e:
             logger.error(f"Error saving outbox event: {e}")
@@ -174,6 +176,7 @@ class SQLAlchemyOutboxRepository(OutboxRepository):
                 event.status = 'PUBLISHED'
                 event.published_at = datetime.utcnow()
                 self.session.add(event)
+                self.session.commit()  # Commit to database
                 logger.info(f"Outbox event {event_id} marked as published")
             else:
                 logger.warning(f"Outbox event {event_id} not found")
@@ -190,6 +193,7 @@ class SQLAlchemyOutboxRepository(OutboxRepository):
                 event.status = 'FAILED'
                 event.attempts += 1
                 self.session.add(event)
+                self.session.commit()  # Commit to database
                 logger.info(f"Outbox event {event_id} marked as failed")
             else:
                 logger.warning(f"Outbox event {event_id} not found")
@@ -247,7 +251,7 @@ class SQLAlchemyCampaignReadRepository(CampaignReadRepository):
         try:
             campaign = self._dict_to_model(campaign_data)
             self.session.add(campaign)
-            self.session.flush()  # Flush to get the ID
+            self.session.commit()  # Commit to database
             logger.info(f"Campaign read model {campaign.id} saved successfully")
         except Exception as e:
             logger.error(f"Error saving campaign read model: {e}")
@@ -266,6 +270,7 @@ class SQLAlchemyCampaignReadRepository(CampaignReadRepository):
                     setattr(campaign, key, value)
             
             self.session.add(campaign)
+            self.session.commit()  # Commit to database
             logger.info(f"Campaign read model {campaign_id} updated successfully")
         except Exception as e:
             logger.error(f"Error updating campaign read model {campaign_id}: {e}")
@@ -278,6 +283,7 @@ class SQLAlchemyCampaignReadRepository(CampaignReadRepository):
             campaign = self.session.get(CampanaReadDBModel, campaign_id)
             if campaign:
                 self.session.delete(campaign)
+                self.session.commit()  # Commit to database
                 logger.info(f"Campaign read model {campaign_id} deleted successfully")
             else:
                 logger.warning(f"Campaign read model {campaign_id} not found for deletion")
