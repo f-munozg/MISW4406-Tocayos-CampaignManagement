@@ -144,15 +144,22 @@ class PulsarEventConsumer:
         """Procesa mensajes del consumer"""
         try:
             while True:
-                msg = consumer.receive(timeout_millis=1000)
                 try:
+                    msg = consumer.receive(timeout_millis=1000)
                     # Deserializar el mensaje
                     event_data = json.loads(msg.data().decode('utf-8'))
                     callback(event_data)
                     consumer.acknowledge(msg)
                 except Exception as e:
-                    logger.error(f"Error procesando mensaje: {e}")
-                    consumer.negative_acknowledge(msg)
+                    # Check if it's a timeout exception (normal behavior when no messages)
+                    if "TimeOut" in str(e) or "timeout" in str(e).lower():
+                        # This is normal - no messages available, continue waiting
+                        continue
+                    else:
+                        # This is an actual error processing a message
+                        logger.error(f"Error procesando mensaje: {e}")
+                        if 'msg' in locals():
+                            consumer.negative_acknowledge(msg)
         except Exception as e:
             logger.error(f"Error en el procesamiento de mensajes: {e}")
     
