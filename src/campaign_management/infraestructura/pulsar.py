@@ -78,7 +78,7 @@ class PulsarEventPublisher:
             logger.error(f"Error publicando evento en Pulsar: {e}")
             raise
     
-    def publish_json(self, topic_name: str, key: str = None, payload: dict = None):
+    def publish_json(self, topic_name: str, key: Any = None, payload: dict = None):
         """Publica un payload JSON en Pulsar"""
         try:
             producer = self._get_producer(topic_name)
@@ -93,8 +93,10 @@ class PulsarEventPublisher:
             message = json_data.encode('utf-8')
             
             if key:
-                producer.send(message, partition_key=key)
-                logger.info(f"JSON publicado en {topic_name} con key {key}")
+                # Convertir key a string si es necesario (para UUIDs, etc.)
+                partition_key = str(key) if key is not None else None
+                producer.send(message, partition_key=partition_key)
+                logger.info(f"JSON publicado en {topic_name} con key {partition_key}")
             else:
                 producer.send(message)
                 logger.info(f"JSON publicado en {topic_name}")
