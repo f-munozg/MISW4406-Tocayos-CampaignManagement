@@ -122,10 +122,22 @@ class PulsarEventConsumer:
         return self.client
     
     def subscribe_to_topic(self, topic_name: str, subscription_name: str, callback):
-        """Se suscribe a un topic específico"""
+        """Se suscribe a un topic específico con mejor manejo de errores"""
         try:
+            logger.info(f"Attempting to subscribe to topic: {topic_name}")
+            logger.info(f"Using subscription: {subscription_name}")
+            logger.info(f"Pulsar service URL: {self.config.service_url}")
+            
             client = self._get_client()
-            consumer = client.subscribe(topic=topic_name, subscription_name=subscription_name, consumer_type=ConsumerType.Shared)
+            logger.info("Pulsar client created successfully")
+            
+            consumer = client.subscribe(
+                topic=topic_name, 
+                subscription_name=subscription_name, 
+                consumer_type=ConsumerType.Shared
+            )
+            logger.info("Pulsar consumer created successfully")
+            
             self.consumers[topic_name] = consumer
             
             # Procesar mensajes en un hilo separado
@@ -134,22 +146,28 @@ class PulsarEventConsumer:
             thread.daemon = True
             thread.start()
             
-            logger.info(f"Suscrito al topic {topic_name} con subscription {subscription_name}")
+            logger.info(f"Successfully subscribed to topic {topic_name} with subscription {subscription_name}")
             
         except Exception as e:
             logger.error(f"Error suscribiéndose al topic {topic_name}: {e}")
+            logger.error(f"Topic name: {topic_name}")
+            logger.error(f"Subscription name: {subscription_name}")
+            logger.error(f"Service URL: {self.config.service_url}")
             raise
     
     def _process_messages(self, consumer, callback):
-        """Procesa mensajes del consumer"""
+        """Procesa mensajes del consumer con mejor manejo de errores"""
+        logger.info("Starting message processing loop")
         try:
             while True:
                 try:
                     msg = consumer.receive(timeout_millis=1000)
                     # Deserializar el mensaje
                     event_data = json.loads(msg.data().decode('utf-8'))
+                    logger.debug(f"Received message: {event_data.get('event_type', 'unknown')}")
                     callback(event_data)
                     consumer.acknowledge(msg)
+                    logger.debug("Message acknowledged successfully")
                 except Exception as e:
                     # Check if it's a timeout exception (normal behavior when no messages)
                     if "TimeOut" in str(e) or "timeout" in str(e).lower():
@@ -158,10 +176,17 @@ class PulsarEventConsumer:
                     else:
                         # This is an actual error processing a message
                         logger.error(f"Error procesando mensaje: {e}")
+                        logger.error(f"Exception type: {type(e).__name__}")
                         if 'msg' in locals():
-                            consumer.negative_acknowledge(msg)
+                            try:
+                                consumer.negative_acknowledge(msg)
+                                logger.info("Message negatively acknowledged")
+                            except Exception as nack_error:
+                                logger.error(f"Error in negative acknowledge: {nack_error}")
         except Exception as e:
             logger.error(f"Error en el procesamiento de mensajes: {e}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            # Don't re-raise to prevent consumer crash
     
     def close(self):
         """Cierra todas las conexiones"""

@@ -97,6 +97,7 @@ def create_app():
         import sys
         
         # Crear e inicializar el servicio de consumo de eventos con la app
+        # Este servicio consume eventos que contienen comandos y los procesa
         event_consumer_service = EventConsumerService(app)
         event_consumer_service.start_consuming()
         logger.info("Servicio de consumo de eventos iniciado")

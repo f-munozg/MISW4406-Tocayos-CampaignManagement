@@ -4,11 +4,12 @@
 # ----------------------------------------------------------------
 
 import logging
+import uuid
 from datetime import datetime
 
 from campaign_management.config.db import db
-from campaign_management.infraestructura.pulsar import pulsar_consumer
-from campaign_management.modulos.campaign_management.infraestructura.modelos import CampanaDBModel
+from campaign_management.infraestructura.pulsar import PulsarEventConsumer, PulsarConfig
+from campaign_management.modulos.campaign_management.infraestructura.modelos_read import CampanaReadDBModel
 
 logger = logging.getLogger(__name__)
 
@@ -16,70 +17,165 @@ TOPIC_CAMPAIGN = "campaign-events"
 SUBSCRIPTION  = "campaign-projection"
 
 class EventConsumerService:
+    def __init__(self):
+        self.config = PulsarConfig()
+        self.consumer = PulsarEventConsumer()
+        self.running = False
+    
     def start_consuming(self):
-        pulsar_consumer.subscribe(TOPIC_CAMPAIGN, SUBSCRIPTION, self._on_message)
+        """Start consuming events with proper error handling"""
+        try:
+            topic_name = self.config.get_topic_name(TOPIC_CAMPAIGN)
+            logger.info(f"Starting to consume from topic: {topic_name}")
+            
+            self.running = True
+            self.consumer.subscribe_to_topic(topic_name, SUBSCRIPTION, self._on_message)
+            logger.info("Successfully started consuming events")
+            
+        except Exception as e:
+            logger.error(f"Failed to start consuming events: {e}")
+            self.running = False
+            # Don't re-raise the exception to prevent container restart
+            # Instead, log the error and continue
+    
+    def stop_consuming(self):
+        """Stop consuming events"""
+        if not self.running:
+            return
+        
+        self.running = False
+        try:
+            self.consumer.close()
+            logger.info("Event consumer stopped")
+        except Exception as e:
+            logger.error(f"Error stopping event consumer: {e}")
 
     # ----- Dispatcher por tipo de evento -----
     def _on_message(self, payload: dict):
-        et = payload.get("event_type")
-        if et == "CampaignCreated":
-            self._apply_campaign_created(payload)
-        elif et == "CampaignActivated":
-            self._apply_campaign_status_change(payload, "activa")
-        elif et == "CampaignPaused":
-            self._apply_campaign_status_change(payload, "pausada")
-        elif et == "CampaignFinalized":
-            self._apply_campaign_status_change(payload, "finalizada")
-        else:
-            logger.info("Evento ignorado: %s", et)
+        """Handle incoming messages with error recovery"""
+        try:
+            if not self.running:
+                logger.info("Consumer stopped, ignoring message")
+                return
+                
+            et = payload.get("event_type")
+            logger.info(f"Processing event: {et}")
+            
+            if et == "CampaignCreated":
+                self._apply_campaign_created(payload)
+            elif et == "CampaignActivated":
+                self._apply_campaign_status_change(payload, "activa")
+            elif et == "CampaignPaused":
+                self._apply_campaign_status_change(payload, "pausada")
+            elif et == "CampaignFinalized":
+                self._apply_campaign_status_change(payload, "finalizada")
+            else:
+                logger.info("Evento ignorado: %s", et)
+                
+        except Exception as e:
+            logger.error(f"Error processing message: {e}")
+            logger.error(f"Message payload: {payload}")
+            # Don't re-raise to prevent consumer crash
 
     # ----- Aplicadores (proyección) -----
     def _apply_campaign_created(self, ev: dict):
-        data = ev.get("data", {})
-        aggregate_id = data.get("id")
-        version = int(ev.get("version", 1))
+        """Apply CampaignCreated event to read model with error handling"""
+        try:
+            data = ev.get("data", {})
+            aggregate_id = data.get("id")
+            version = int(ev.get("version", 1))
 
-        with db.session.begin():
-            # Si ya existe y version >= guardada, no duplicar
-            camp: CampanaDBModel | None = db.session.get(CampanaDBModel, aggregate_id)
-            if camp:
-                # Idempotencia básica: no reinsertar
+            if not aggregate_id:
+                logger.warning("Campaign ID not found in event data")
                 return
 
-            camp = CampanaDBModel(
-                id=aggregate_id,
-                id_marca=data.get("id_marca"),
-                nombre=data.get("nombre"),
-                tipo_campana=data.get("tipo_campana"),
-                estado="borrador",
-                fecha_inicio=self._parse_iso(data.get("fecha_inicio")),
-                fecha_fin=self._parse_iso(data.get("fecha_fin")),
-                # iniciales:
-                presupuesto_total=0.0,
-                presupuesto_utilizado=0.0,
-                meta_ventas=0,
-                ventas_actuales=0,
-                meta_engagement=0,
-                engagement_actual=0,
-                # pista mínima para idempotencia por evento
-                fecha_ultima_actividad=datetime.utcnow()
-            )
-            db.session.add(camp)
+            with db.session.begin():
+                # Save to campaigns_read table (read model)
+                existing: CampanaReadDBModel | None = db.session.get(CampanaReadDBModel, aggregate_id)
+                if existing:
+                    # idempotencia: si ya existe y la versión aplicada >= versión del evento, ignorar
+                    if existing.last_version >= version:
+                        logger.info(f"Campaign {aggregate_id} already up to date (version {version})")
+                        return
+                    # si existe pero con menor versión, actualizar campos básicos
+                    existing.nombre = data.get("nombre") or existing.nombre
+                    existing.tipo_campana = data.get("tipo_campana") or existing.tipo_campana
+                    existing.fecha_inicio = self._parse_iso(data.get("fecha_inicio")) or existing.fecha_inicio
+                    existing.fecha_fin = self._parse_iso(data.get("fecha_fin")) or existing.fecha_fin
+                    existing.last_version = version
+                    existing.fecha_ultima_actividad = datetime.utcnow()
+                    db.session.add(existing)
+                    logger.info(f"Updated existing campaign {aggregate_id}")
+                    return
+
+                row = CampanaReadDBModel(
+                    id=aggregate_id,
+                    id_marca=data.get("id_marca"),
+                    nombre=data.get("nombre"),
+                    tipo_campana=data.get("tipo_campana"),
+                    estado="borrador",
+                    fecha_inicio=self._parse_iso(data.get("fecha_inicio")),
+                    fecha_fin=self._parse_iso(data.get("fecha_fin")),
+                    presupuesto_total=0.0,
+                    presupuesto_utilizado=0.0,
+                    meta_ventas=0,
+                    ventas_actuales=0,
+                    meta_engagement=0,
+                    engagement_actual=0,
+                    last_version=version,
+                    fecha_ultima_actividad=datetime.utcnow()
+                )
+                if row.id_marca is None:
+                    row.id_marca = uuid.uuid4()
+
+                if row.nombre is None:
+                    row.nombre = ""
+
+                if row.tipo_campana is None:
+                    row.tipo_campana = ""
+                
+                db.session.add(row)
+                logger.info(f"Created new campaign read model {aggregate_id}")
+                
+        except Exception as e:
+            logger.error(f"Error applying CampaignCreated event: {e}")
+            logger.error(f"Event data: {ev}")
+            # Rollback the transaction
+            db.session.rollback()
+            raise
 
     def _apply_campaign_status_change(self, ev: dict, new_status: str):
-        aggregate_id = ev.get("aggregate_id")
-        version = int(ev.get("version", 1))
+        """Apply campaign status change event to read model with error handling"""
+        try:
+            aggregate_id = ev.get("aggregate_id")
+            version = int(ev.get("version", 1))
 
-        with db.session.begin():
-            camp: CampanaDBModel | None = db.session.get(CampanaDBModel, aggregate_id)
-            if not camp:
-                logger.warning("Evento %s para campaña inexistente %s", ev.get("event_type"), aggregate_id)
+            if not aggregate_id:
+                logger.warning("Campaign ID not found in status change event")
                 return
 
-            # Actualizar la proyección
-            camp.estado = new_status
-            camp.fecha_ultima_actividad = datetime.utcnow()
-            db.session.add(camp)
+            with db.session.begin():
+                # Update campaigns_read table (read model)
+                row: CampanaReadDBModel | None = db.session.get(CampanaReadDBModel, aggregate_id)
+                if not row:
+                    logger.warning("Evento %s para campaña inexistente %s", ev.get("event_type"), aggregate_id)
+                    return
+                if row.last_version >= version:
+                    logger.info(f"Campaign {aggregate_id} already up to date (version {version})")
+                    return
+
+                row.estado = new_status
+                row.last_version = version
+                row.fecha_ultima_actividad = datetime.utcnow()
+                db.session.add(row)
+                logger.info(f"Updated campaign {aggregate_id} status to {new_status}")
+                
+        except Exception as e:
+            logger.error(f"Error applying campaign status change event: {e}")
+            logger.error(f"Event data: {ev}")
+            # Rollback the transaction
+            db.session.rollback()
+            raise
 
     @staticmethod
     def _parse_iso(s: str | None):

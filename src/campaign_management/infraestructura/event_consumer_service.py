@@ -1,4 +1,5 @@
 import logging
+import json
 from datetime import datetime
 from flask import current_app
 from typing import Dict, Any
@@ -7,7 +8,8 @@ import uuid
 
 from campaign_management.config.db import db
 from campaign_management.infraestructura.pulsar import PulsarEventConsumer, PulsarConfig
-from campaign_management.modulos.campaign_management.infraestructura.modelos_read import CampanaReadDBModel
+from campaign_management.modulos.campaign_management.infraestructura.modelos import CampanaDBModel
+from campaign_management.infraestructura.outbox.model import OutboxEvent
 
 logger = logging.getLogger(__name__)
 
@@ -102,26 +104,18 @@ class EventConsumerService:
         version = int(ev.get("version", 1))
 
         with db.session.begin():
-            existing: CampanaReadDBModel | None = db.session.get(CampanaReadDBModel, aggregate_id)
+            # Save to campaigns table (write model)
+            existing: CampanaDBModel | None = db.session.get(CampanaDBModel, aggregate_id)
             if existing:
-                # idempotencia: si ya existe y la versión aplicada >= versión del evento, ignorar
-                if existing.last_version >= version:
-                    return
-                # si existe pero con menor versión (poco probable al crear), actualizar campos básicos
-                existing.nombre = data.get("nombre") or existing.nombre
-                existing.tipo_campana = data.get("tipo") or existing.tipo_campana
-                existing.fecha_inicio = self._parse_iso(data.get("fecha_inicio")) or existing.fecha_inicio
-                existing.fecha_fin = self._parse_iso(data.get("fecha_fin")) or existing.fecha_fin
-                existing.last_version = version
-                existing.fecha_ultima_actividad = datetime.utcnow()
-                db.session.add(existing)
+                # idempotencia: si ya existe, no duplicar
                 return
 
-            row = CampanaReadDBModel(
+            camp = CampanaDBModel(
                 id=aggregate_id,
                 id_marca=data.get("id_marca"),
                 nombre=data.get("nombre"),
-                tipo_campana=data.get("tipo"),
+                tipo_campana=data.get("tipo_campana"),
+                objetivo=data.get("objetivo", "ventas"),  # default value
                 estado="borrador",
                 fecha_inicio=self._parse_iso(data.get("fecha_inicio")),
                 fecha_fin=self._parse_iso(data.get("fecha_fin")),
@@ -131,36 +125,53 @@ class EventConsumerService:
                 ventas_actuales=0,
                 meta_engagement=0,
                 engagement_actual=0,
-                last_version=version,
                 fecha_ultima_actividad=datetime.utcnow()
             )
-            if row.id_marca is None:
-                row.id_marca = uuid.uuid4()
+            if camp.id_marca is None:
+                camp.id_marca = uuid.uuid4()
 
-            if row.nombre is None:
-                row.nombre = ""
+            if camp.nombre is None:
+                camp.nombre = ""
 
-            if row.tipo_campana is None:
-                row.tipo_campana = ""
+            if camp.tipo_campana is None:
+                camp.tipo_campana = ""
             
-            db.session.add(row)
+            db.session.add(camp)
+            
+            # Save to outbox table for event publishing
+            outbox_event = OutboxEvent(
+                aggregate_id=aggregate_id,
+                aggregate_type='Campaign',
+                event_type='CampaignCreated',
+                payload=json.dumps(ev, default=str),
+                status='PENDING'
+            )
+            db.session.add(outbox_event)
 
     def _apply_campaign_status_change(self, ev: dict, new_status: str):
         aggregate_id = ev.get("aggregate_id")
         version = int(ev.get("version", 1))
 
         with db.session.begin():
-            row: CampanaReadDBModel | None = db.session.get(CampanaReadDBModel, aggregate_id)
-            if not row:
+            # Update campaigns table (write model)
+            camp: CampanaDBModel | None = db.session.get(CampanaDBModel, aggregate_id)
+            if not camp:
                 logger.warning("Evento %s para campaña inexistente %s", ev.get("event_type"), aggregate_id)
                 return
-            if row.last_version >= version:
-                return
 
-            row.estado = new_status
-            row.last_version = version
-            row.fecha_ultima_actividad = datetime.utcnow()
-            db.session.add(row)
+            camp.estado = new_status
+            camp.fecha_ultima_actividad = datetime.utcnow()
+            db.session.add(camp)
+            
+            # Save to outbox table for event publishing
+            outbox_event = OutboxEvent(
+                aggregate_id=aggregate_id,
+                aggregate_type='Campaign',
+                event_type=ev.get("event_type"),
+                payload=json.dumps(ev, default=str),
+                status='PENDING'
+            )
+            db.session.add(outbox_event)
 
     @staticmethod
     def _parse_iso(s: str | None):
