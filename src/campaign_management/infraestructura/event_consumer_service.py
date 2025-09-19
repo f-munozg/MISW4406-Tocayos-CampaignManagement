@@ -32,9 +32,18 @@ class EventConsumerService:
 
     def stop_consuming(self):
         """Detiene el consumo de eventos"""
+        if not self.running:
+            return  # Ya está detenido
+        
         self.running = False
-        for consumer in self.consumers.values():
-            consumer.close()
+        for event_type, consumer in self.consumers.items():
+            try:
+                consumer.close()
+                logger.info(f"Consumidor {event_type} cerrado")
+            except Exception as e:
+                logger.error(f"Error cerrando consumidor {event_type}: {e}")
+        
+        self.consumers.clear()
         logger.info("Servicio de consumo de eventos detenido")
 
     def _start_consumer(self, event_type: str, handler):

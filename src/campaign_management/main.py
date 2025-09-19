@@ -93,6 +93,8 @@ def create_app():
         from campaign_management.infraestructura.event_consumer_service import EventConsumerService
         from campaign_management.infraestructura.pulsar import pulsar_publisher
         import atexit
+        import signal
+        import sys
         
         # Crear e inicializar el servicio de consumo de eventos con la app
         event_consumer_service = EventConsumerService(app)
@@ -100,7 +102,19 @@ def create_app():
         logger.info("Servicio de consumo de eventos iniciado")
         
         # Registrar función de limpieza al cerrar la aplicación
-        atexit.register(cleanup_pulsar_connections)
+        # Solo registrar una vez para evitar múltiples registros
+        if not hasattr(cleanup_pulsar_connections, '_registered'):
+            atexit.register(cleanup_pulsar_connections)
+            cleanup_pulsar_connections._registered = True
+        
+        # Registrar manejadores de señales para shutdown graceful
+        def signal_handler(signum, frame):
+            logger.info(f"Recibida señal {signum}, cerrando aplicación...")
+            cleanup_pulsar_connections()
+            sys.exit(0)
+        
+        signal.signal(signal.SIGTERM, signal_handler)
+        signal.signal(signal.SIGINT, signal_handler)
         
     except Exception as e:
         logger.warning(f"Pulsar no disponible, continuando sin eventos: {e}")
@@ -109,10 +123,20 @@ def create_app():
 
 def cleanup_pulsar_connections():
     """Limpia las conexiones de Pulsar al cerrar la aplicación"""
+    # Prevenir múltiples ejecuciones
+    if hasattr(cleanup_pulsar_connections, '_cleaned_up'):
+        return
+    cleanup_pulsar_connections._cleaned_up = True
+    
     try:
         from campaign_management.infraestructura.pulsar import pulsar_publisher
-        # Note: The event_consumer_service instance is local to create_app()
-        # The Pulsar consumer will be cleaned up when the process exits
+        from campaign_management.infraestructura.event_consumer_service import event_consumer_service
+        
+        # Cerrar el servicio de consumo de eventos si está disponible
+        if hasattr(event_consumer_service, 'stop_consuming'):
+            event_consumer_service.stop_consuming()
+        
+        # Cerrar el publisher
         pulsar_publisher.close()
         logger.info("Conexiones de Pulsar cerradas correctamente")
     except Exception as e:
