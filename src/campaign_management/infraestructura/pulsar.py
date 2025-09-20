@@ -94,6 +94,8 @@ class PulsarEventPublisher:
             if payload is None:
                 payload = {}
             
+            
+
             json_data = json.dumps(payload, default=str)
             
             # Crear el mensaje con key si se proporciona
