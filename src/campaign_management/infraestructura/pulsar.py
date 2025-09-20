@@ -94,12 +94,14 @@ class PulsarEventPublisher:
             if payload is None:
                 payload = {}
             
-            
+
 
             json_data = json.dumps(payload, default=str)
             
             # Crear el mensaje con key si se proporciona
             message = json_data.encode('utf-8')
+
+            logger.info(f"Evento a publicar desde campañas {message}")
             
             if key:
                 # Convertir key a string si es necesario (para UUIDs, etc.)

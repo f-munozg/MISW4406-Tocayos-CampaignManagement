@@ -41,7 +41,14 @@ def publish_pending_batch(batch_size: int = 200):
     with db.engine.begin() as conn:
         rows = conn.execute(
             text("""
-                SELECT id as saga_id, aggregate_id as event_id, event_type, payload as event_data, status, aggregate_type as service, occurred_at as timestamp
+                SELECT 
+                    id as saga_id, 
+                    aggregate_type as service, 
+                    status, 
+                    aggregate_id as event_id, 
+                    event_type, 
+                    payload as event_data, 
+                    occurred_at as timestamp
                 FROM outbox_events
                 WHERE status = 'PENDING'
                 ORDER BY occurred_at
@@ -57,7 +64,9 @@ def publish_pending_batch(batch_size: int = 200):
             except Exception:
                 logger.exception("Error publicando outbox id=%s", r["id"])
                 conn.execute(
-                    text("UPDATE outbox_events SET status='FAILED', attempts=attempts+1 WHERE id=:id"),
+                    text("UPDATE outbox_events " \
+                         "SET status='FAILED', attempts=attempts+1 " \
+                         "WHERE id=:id"),
                     {"id": r["id"]}
                 )
 
