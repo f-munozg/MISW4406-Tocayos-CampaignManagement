@@ -6,6 +6,7 @@ En este archivo se define la configuración y utilidades para Pulsar
 
 import os
 import json
+import uuid
 import logging
 import pulsar
 from typing import Dict, Any
@@ -58,17 +59,23 @@ class PulsarEventPublisher:
             self.producers[topic_name] = client.create_producer(topic_name)
         return self.producers[topic_name]
     
-    def publish_event(self, evento: EventoDominio, event_type: str):
+    def publish_event(self, evento: EventoDominio, event_type: str, status: str):
         """Publica un evento en Pulsar"""
         try:
             topic_name = self.config.get_topic_name(event_type)
             producer = self._get_producer(topic_name)
             
             # Serializar el evento
-            event_data = self._serialize_event(evento)
-
-            if event_type == 'campaign-events':
-                event_data = self._alternate_serialize_event(evento)
+            event_dict = {
+                'saga_id': uuid.uuid4(),
+                'service': 'Campaign',
+                'status': status, 
+                'event_id': evento.id,
+                'event_type': event_type,
+                'event_data': evento.__dict__,
+                'timestamp': evento.fecha_evento.isoformat() if hasattr(evento, 'fecha_evento') else None
+            }
+            event_data=json.dumps(event_dict, default=str)
             
             # Publicar el evento
             producer.send(event_data.encode('utf-8'))
@@ -116,29 +123,29 @@ class PulsarEventPublisher:
         except Exception as e:
             logger.error(f"Error cerrando conexiones del publisher: {e}")
     
-    def _serialize_event(self, evento: EventoDominio) -> str:
-        """Serializa un evento a JSON"""
-        event_dict = {
-            'event_type': evento.__class__.__name__,
-            'event_data': evento.__dict__,
-            'timestamp': evento.fecha_evento.isoformat() if hasattr(evento, 'fecha_evento') else None
-        }
-        return json.dumps(event_dict, default=str)
+    # def _serialize_event(self, evento: EventoDominio) -> str:
+    #     """Serializa un evento a JSON"""
+    #     event_dict = {
+    #         'event_type': evento.__class__.__name__,
+    #         'event_data': evento.__dict__,
+    #         'timestamp': evento.fecha_evento.isoformat() if hasattr(evento, 'fecha_evento') else None
+    #     }
+    #     return json.dumps(event_dict, default=str)
     
-    def _alternate_serialize_event(self, evento: EventoDominio) -> str:
-        """Serializa un evento a JSON alternativo"""
-        event_dict = {
-            'event_type': evento.__class__.__name__,
-            'event_data': evento.__dict__,
-            'timestamp': evento.fecha_evento.isoformat() if hasattr(evento, 'fecha_evento') else None
-        }
+    # def _alternate_serialize_event(self, evento: EventoDominio) -> str:
+    #     """Serializa un evento a JSON alternativo"""
+    #     event_dict = {
+    #         'event_type': evento.__class__.__name__,
+    #         'event_data': evento.__dict__,
+    #         'timestamp': evento.fecha_evento.isoformat() if hasattr(evento, 'fecha_evento') else None
+    #     }
 
-        if evento.__class__.__name__ == 'ProgramaLealtadActivado':
-            event_dict['event_type'] = 'CampaignActivated'
-        elif evento.__class__.__name__ == 'ProgramaLealtadRegistrado':
-            event_dict['event_type'] = 'CampaignCreated'
+    #     if evento.__class__.__name__ == 'ProgramaLealtadActivado':
+    #         event_dict['event_type'] = 'CampaignActivated'
+    #     elif evento.__class__.__name__ == 'ProgramaLealtadRegistrado':
+    #         event_dict['event_type'] = 'CampaignCreated'
 
-        return json.dumps(event_dict, default=str)
+    #     return json.dumps(event_dict, default=str)
 
     def close(self):
         """Cierra todas las conexiones"""

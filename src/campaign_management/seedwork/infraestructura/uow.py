@@ -103,7 +103,7 @@ class UnidadTrabajoPuerto:
             UnidadTrabajoPuerto._eventos_pendientes.clear()
             
             for evento, event_type in eventos_pendientes:
-                pulsar_publisher.publish_event(evento, event_type)
+                pulsar_publisher.publish_event(evento, event_type, 'Success')
                 logger.info(f"Evento publicado en Pulsar: {evento.__class__.__name__}")
                 
         except Exception as e:
