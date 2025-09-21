@@ -19,7 +19,6 @@ cfg = PulsarConfig()
 
 # Use proper topic names with tenant and namespace
 TOPIC_CAMPAIGN = cfg.get_topic_name("campaign-events")
-TOPIC_CONTENT = cfg.get_topic_name("content-events")
 
 def _publish_one(conn, row):
     payload = json.loads(row["payload"])
@@ -27,9 +26,6 @@ def _publish_one(conn, row):
     
     logger.info(f"Publishing to campaign topic: {TOPIC_CAMPAIGN}")
     pulsar_publisher.publish_json(TOPIC_CAMPAIGN, key=key, payload=payload)
-    
-    logger.info(f"Publishing to content topic: {TOPIC_CONTENT}")
-    pulsar_publisher.publish_json(TOPIC_CONTENT, key=key, payload=payload)
     
     conn.execute(
         text("UPDATE outbox_events SET status='PUBLISHED', published_at=:ts WHERE id=:id"),
@@ -75,7 +71,6 @@ def run_forever(interval_seconds: float = 1.0):
     logging.basicConfig(level=logging.INFO)
     logger.info("Outbox dispatcher iniciado (interval=%.1fs)", interval_seconds)
     logger.info("Campaign topic: %s", TOPIC_CAMPAIGN)
-    logger.info("Content topic: %s", TOPIC_CONTENT)
     try:
         while True:
             publish_pending_batch()
