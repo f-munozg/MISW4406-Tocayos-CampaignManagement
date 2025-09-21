@@ -58,18 +58,11 @@ class EventHandlerFactory:
         """Handle an event using the appropriate handler"""
         try:
             event_type = event_data.get("event_type")
+            event_status = event_data.get("status")
             logger.info(f"Handling event: {event_type}")
             
-            if event_type == "CommandCreateCampaign":
+            if event_type == "CommandCreateCampaign" and event_status == "success":
                 # Handle with both write model and read model handlers
-                try:
-                    # Write model handler (saves to campaigns table and outbox)
-                    write_handler = EventHandlerFactory.create_campaign_event_handler()
-                    write_handler.handle(event_data)
-                    logger.info(f"CampaignCreated event handled by write model handler")
-                except Exception as e:
-                    logger.error(f"Error in write model handler: {e}")
-                
                 try:
                     # Read model handler (saves to campaigns_read table)
                     read_handler = EventHandlerFactory.create_campaign_read_event_handler()

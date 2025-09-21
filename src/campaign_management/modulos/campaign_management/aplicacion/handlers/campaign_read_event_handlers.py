@@ -25,13 +25,14 @@ class CampaignReadEventHandler(EventHandler):
                 return
                 
             event_type = event_data.get("event_type")
+            event_status = event_data.get("status")
             
-            if event_type == "CampaignCreated":
+            if event_type == "CommandCreateCampaign" and event_status == "success":
                 self._handle_campaign_created(event_data)
             elif event_type in ["CampaignActivated", "CampaignPaused", "CampaignFinalized"]:
                 self._handle_campaign_status_change(event_data)
             else:
-                logger.info(f"Event type {event_type} ignored for read model")
+                logger.info(f"Event type {event_type} ignored for read model with status {event_status}")
                 
         except Exception as e:
             logger.error(f"Error handling campaign read event: {e}")

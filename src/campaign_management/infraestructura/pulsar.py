@@ -126,30 +126,6 @@ class PulsarEventPublisher:
             logger.info("Pulsar publisher connections closed")
         except Exception as e:
             logger.error(f"Error cerrando conexiones del publisher: {e}")
-    
-    # def _serialize_event(self, evento: EventoDominio) -> str:
-    #     """Serializa un evento a JSON"""
-    #     event_dict = {
-    #         'event_type': evento.__class__.__name__,
-    #         'event_data': evento.__dict__,
-    #         'timestamp': evento.fecha_evento.isoformat() if hasattr(evento, 'fecha_evento') else None
-    #     }
-    #     return json.dumps(event_dict, default=str)
-    
-    # def _alternate_serialize_event(self, evento: EventoDominio) -> str:
-    #     """Serializa un evento a JSON alternativo"""
-    #     event_dict = {
-    #         'event_type': evento.__class__.__name__,
-    #         'event_data': evento.__dict__,
-    #         'timestamp': evento.fecha_evento.isoformat() if hasattr(evento, 'fecha_evento') else None
-    #     }
-
-    #     if evento.__class__.__name__ == 'ProgramaLealtadActivado':
-    #         event_dict['event_type'] = 'CampaignActivated'
-    #     elif evento.__class__.__name__ == 'ProgramaLealtadRegistrado':
-    #         event_dict['event_type'] = 'CampaignCreated'
-
-    #     return json.dumps(event_dict, default=str)
 
     def close(self):
         """Cierra todas las conexiones"""

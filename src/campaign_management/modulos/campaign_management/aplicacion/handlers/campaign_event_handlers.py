@@ -71,7 +71,7 @@ class CampaignCreatedEventHandler(EventHandler):
                 "saga_id": data.get("saga_id"),
                 "aggregate_id": aggregate_id,
                 "aggregate_type": "Campaign",
-                "event_type": "CampaignCreated",
+                "event_type": "EventCampaignCreated",
                 "payload": json.dumps(event_data, default=str),
                 "status": "PENDING"
             }

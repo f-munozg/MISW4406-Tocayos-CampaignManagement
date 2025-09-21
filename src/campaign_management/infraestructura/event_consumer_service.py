@@ -161,7 +161,7 @@ class EventConsumerService:
                 saga_id = data.get("saga_id"),
                 aggregate_id=aggregate_id,
                 aggregate_type='Campaign',
-                event_type='CampaignCreated',
+                event_type='EventCampaignCreated',
                 payload=json.dumps(ev, default=str),
                 status='PENDING'
             )
