@@ -68,6 +68,7 @@ class CampaignCreatedEventHandler(EventHandler):
             
             # Save to outbox for event publishing
             outbox_event = {
+                "saga_id": data.get("saga_id"),
                 "aggregate_id": aggregate_id,
                 "aggregate_type": "Campaign",
                 "event_type": "CampaignCreated",

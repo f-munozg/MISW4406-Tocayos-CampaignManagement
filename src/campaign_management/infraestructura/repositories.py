@@ -179,6 +179,7 @@ class SQLAlchemyOutboxRepository(OutboxRepository):
                 self.session.commit()  # Commit to database
                 logger.info(f"Outbox event {event_id} marked as published")
             else:
+                logger.warning(f"Clase: SQLAlchemyOutboxRepository | Metodo: mark_as_published | Linea: 182")
                 logger.warning(f"Outbox event {event_id} not found")
         except Exception as e:
             logger.error(f"Error marking outbox event {event_id} as published: {e}")
@@ -196,6 +197,7 @@ class SQLAlchemyOutboxRepository(OutboxRepository):
                 self.session.commit()  # Commit to database
                 logger.info(f"Outbox event {event_id} marked as failed")
             else:
+                logger.warning(f"Clase: SQLAlchemyOutboxRepository | Metodo: mark_as_failed | Linea: 200")
                 logger.warning(f"Outbox event {event_id} not found")
         except Exception as e:
             logger.error(f"Error marking outbox event {event_id} as failed: {e}")
@@ -220,6 +222,7 @@ class SQLAlchemyOutboxRepository(OutboxRepository):
         """Convert dictionary to model"""
         return OutboxEvent(
             id=data.get("id"),
+            saga_id=data.get("saga_id"),
             aggregate_id=data.get("aggregate_id"),
             aggregate_type=data.get("aggregate_type", "Campaign"),
             event_type=data.get("event_type"),

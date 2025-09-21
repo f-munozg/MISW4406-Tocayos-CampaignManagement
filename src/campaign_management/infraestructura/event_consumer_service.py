@@ -1,6 +1,7 @@
 import logging
 import json
 from datetime import datetime
+from campaign_management.modulos.campaign_management.aplicacion.comandos.comandos_campana import CancelarCampana
 from flask import current_app
 from typing import Dict, Any
 
@@ -10,6 +11,7 @@ from campaign_management.config.db import db
 from campaign_management.infraestructura.pulsar import PulsarEventConsumer, PulsarConfig
 from campaign_management.modulos.campaign_management.infraestructura.modelos import CampanaDBModel
 from campaign_management.infraestructura.outbox.model import OutboxEvent
+from campaign_management.infraestructura.pulsar import pulsar_publisher
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +30,8 @@ class EventConsumerService:
         self.running = True
         
         # Eventos de programas de lealtad
-        self._start_consumer('campaign-events', self._on_message)
+        self._start_consumer('loyalty-events', self._on_message_loyalty)
+        self._start_consumer('campaign-events', self._on_message_campaign)
         
         logger.info("Servicio de consumo de eventos iniciado")
 
@@ -60,7 +63,24 @@ class EventConsumerService:
         except Exception as e:
             logger.error(f"Error iniciando consumidor para {event_type}: {e}")
 
-    def _on_message(self, event_data: Dict[str, Any]):
+    def _on_message_loyalty(self, event_data: Dict[str, Any]):
+        try:
+            # Ensure we have Flask application context
+            if self.app:
+                with self.app.app_context():
+                    self._process_event(event_data)
+            else:
+                # Fallback: try to get current app context
+                try:
+                    with current_app.app_context():
+                        self._process_event(event_data)
+                except RuntimeError:
+                    logger.error("No Flask application context available for event processing")
+                    return
+        except Exception as e:
+            logger.error(f"Error procesando evento de programa de lealtad: {e}")
+
+    def _on_message_campaign(self, event_data: Dict[str, Any]):
         try:
             # Ensure we have Flask application context
             if self.app:
@@ -85,14 +105,10 @@ class EventConsumerService:
         logger.info(f"Procesando evento de campañas: {event_type}")
         
         # Aquí se pueden agregar lógicas específicas para cada tipo de evento
-        if event_type == 'CampaignCreated':
+        if event_type == 'CommandCreateCampaign':
             self._apply_campaign_created(event_payload)
-        elif event_type == 'CampaignActivated':
-           self._apply_campaign_status_change(event_payload, "activa")
-        elif event_type == 'CampaignPaused':
-            self._apply_campaign_status_change(event_payload, "pausada")
-        elif event_type == 'CampaignFinalized':
-            self._apply_campaign_status_change(event_payload, "finalizada")
+        elif event_type == 'EventCampaignCreated':
+            self._apply_campaign_reverse_created(event_payload)
         else:
             logger.info("Evento ignorado: %s", event_type)
 
@@ -104,10 +120,8 @@ class EventConsumerService:
         version = int(ev.get("version", 1))
 
         with db.session.begin():
-            # Save to campaigns table (write model)
             existing: CampanaDBModel | None = db.session.get(CampanaDBModel, aggregate_id)
             if existing:
-                # idempotencia: si ya existe, no duplicar
                 return
 
             camp = CampanaDBModel(
@@ -127,6 +141,7 @@ class EventConsumerService:
                 engagement_actual=0,
                 fecha_ultima_actividad=datetime.utcnow()
             )
+
             if camp.id_marca is None:
                 camp.id_marca = uuid.uuid4()
 
@@ -140,6 +155,7 @@ class EventConsumerService:
             
             # Save to outbox table for event publishing
             outbox_event = OutboxEvent(
+                saga_id = data.get("saga_id"),
                 aggregate_id=aggregate_id,
                 aggregate_type='Campaign',
                 event_type='CampaignCreated',
@@ -148,6 +164,37 @@ class EventConsumerService:
             )
             db.session.add(outbox_event)
 
+    def _apply_campaign_reverse_created(self, ev: dict):
+        data = ev.get("data", {})
+        id = data.get("id")
+        saga_id = data.get("saga_id")
+        if id is None:
+            id = uuid.uuid4()
+
+        with db.session.begin():
+            # buscar la campaña y cambiarle el estado
+            camp: CampanaDBModel | None = db.session.get(CampanaDBModel, id)
+            if not camp:
+                logger.warning(f"Clase: EventConsumerService | Metodo: _apply_campaign_reverse_created | Linea: 178")
+                logger.warning("Evento %s para campaña inexistente %s", ev.get("event_type"), id)
+                return
+
+            camp.estado = 'cancelada'
+            camp.fecha_ultima_actividad = datetime.utcnow()
+            db.session.commit(camp)
+
+            evento = CancelarCampana(
+                id_campana=camp.id,
+                motivo='Se presento un error con la creacion de la campaña',
+                fecha_actualizacion=datetime.now()
+            )
+            # escribir en la cola de loyalty
+            pulsar_publisher.publish_event(evento, saga_id, 'loyalty-events', 'CommandCreateCampaign', 'Failed')
+            # escribir en la cola de campaigns
+
+            evento.motivo = "Se ha actualizado el estado de la campaña a cancelado"
+            pulsar_publisher.publish_event(evento, saga_id, 'campaign-events', 'EventCampaignRollbacked', 'Success')
+    
     def _apply_campaign_status_change(self, ev: dict, new_status: str):
         aggregate_id = ev.get("aggregate_id")
         version = int(ev.get("version", 1))

@@ -118,6 +118,7 @@ def create_app():
         signal.signal(signal.SIGINT, signal_handler)
         
     except Exception as e:
+        logger.warning(f"Clase: Main | Metodo: createApp | Linea: 121")
         logger.warning(f"Pulsar no disponible, continuando sin eventos: {e}")
     
     return app

@@ -31,15 +31,16 @@ CREATE TABLE IF NOT EXISTS campaigns (
 
 -- Tabla Outbox
 CREATE TABLE IF NOT EXISTS outbox_events (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    aggregate_id UUID NOT NULL,
-    aggregate_type VARCHAR(50) NOT NULL DEFAULT 'Campaign',
-    event_type VARCHAR(100) NOT NULL,
-    payload TEXT NOT NULL,
-    occurred_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    published_at TIMESTAMP NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'PENDING', -- PENDING|PUBLISHED|FAILED
-    attempts INT NOT NULL DEFAULT 0
+id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    saga_id         UUID NOT NULL,
+    aggregate_id    UUID NOT NULL,
+    aggregate_type  VARCHAR(50) NOT NULL DEFAULT 'Campaign',
+    event_type      VARCHAR(100) NOT NULL,
+    payload         TEXT NOT NULL,
+    occurred_at     TIMESTAMP NOT NULL DEFAULT NOW(),
+    published_at    TIMESTAMP NULL,
+    status          VARCHAR(20) NOT NULL DEFAULT 'PENDING', -- PENDING|PUBLISHED|FAILED
+    attempts        INT NOT NULL DEFAULT 0
 );
 
 -- Proyección de lectura 

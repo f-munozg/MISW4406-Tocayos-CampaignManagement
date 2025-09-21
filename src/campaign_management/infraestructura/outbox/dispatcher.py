@@ -42,7 +42,8 @@ def publish_pending_batch(batch_size: int = 200):
         rows = conn.execute(
             text("""
                 SELECT 
-                    id as saga_id, 
+                    id,
+                    saga_id, 
                     aggregate_type as service, 
                     status, 
                     aggregate_id as event_id, 

@@ -59,7 +59,7 @@ class PulsarEventPublisher:
             self.producers[topic_name] = client.create_producer(topic_name)
         return self.producers[topic_name]
     
-    def publish_event(self, evento: EventoDominio, event_type: str, status: str):
+    def publish_event(self, saga_id: uuid, evento: EventoDominio, event_type: str, status: str):
         """Publica un evento en Pulsar"""
         try:
             topic_name = self.config.get_topic_name(event_type)
@@ -67,13 +67,13 @@ class PulsarEventPublisher:
             
             # Serializar el evento
             event_dict = {
-                'saga_id': uuid.uuid4(),
+                'saga_id': saga_id,
                 'service': 'Campaign',
                 'status': status, 
-                'event_id': evento.id,
+                #'event_id': evento.id,
                 'event_type': event_type,
                 'event_data': evento.__dict__,
-                'timestamp': evento.fecha_evento.isoformat() if hasattr(evento, 'fecha_evento') else None
+                #'timestamp': evento.fecha_evento.isoformat() if hasattr(evento, 'fecha_evento') else None
             }
             event_data=json.dumps(event_dict, default=str)
             
@@ -237,6 +237,32 @@ class PulsarEventConsumer:
             logger.error(f"Exception type: {type(e).__name__}")
             # Don't re-raise to prevent consumer crash
     
+    def publish_event(self, evento: EventoDominio, topic: str, event_type: str, status: str):
+        """Publica un evento en Pulsar"""
+        try:
+            topic_name = self.config.get_topic_name(topic)
+            producer = self._get_producer(topic_name)
+            
+            # Serializar el evento
+            event_dict = {
+                'saga_id': uuid.uuid4(),
+                'service': 'Loyalty',
+                'status': status, 
+                'event_id': evento.id,
+                'event_type': event_type,
+                'event_data': evento.__dict__,
+                'timestamp': evento.fecha_evento.isoformat() if hasattr(evento, 'fecha_evento') else None
+            }
+            event_data=json.dumps(event_dict, default=str)
+            
+            # Publicar el evento
+            producer.send(event_data.encode('utf-8'))
+            logger.info(f"Evento publicado en {topic_name}: {evento.__class__.__name__}")
+            
+        except Exception as e:
+            logger.error(f"Error publicando evento en Pulsar: {e}")
+            raise
+
     def close(self):
         """Cierra todas las conexiones"""
         for consumer in self.consumers.values():

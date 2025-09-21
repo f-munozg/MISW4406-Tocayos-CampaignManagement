@@ -13,6 +13,7 @@ class OutboxEvent(db.Model):
     __tablename__ = "outbox_events"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    saga_id = Column(UUID(as_uuid=True), default=uuid.uuid4)
     aggregate_id = Column(UUID(as_uuid=True), nullable=False)
     aggregate_type = Column(String(50), nullable=False, default='Campaign')
     event_type = Column(String(100), nullable=False)
