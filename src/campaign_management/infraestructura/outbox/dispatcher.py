@@ -27,7 +27,7 @@ def _publish_one(conn, row):
     key = row["event_id"]
     
     logger.info(f"Publishing to campaign topic: {TOPIC_CAMPAIGN} with key: {key}")
-    pulsar_publisher.publish_json(TOPIC_CAMPAIGN, key=key, payload=payload)
+    pulsar_publisher.publish_json(key, payload, TOPIC_CAMPAIGN, "success")
     
     conn.execute(
         text("UPDATE outbox_events SET status='PUBLISHED', published_at=:ts WHERE id=:id"),
@@ -41,7 +41,6 @@ def publish_pending_batch(batch_size: int = 200):
             text("""
                 SELECT 
                     id,
-                    saga_id, 
                     aggregate_type as service, 
                     status, 
                     aggregate_id as event_id, 
