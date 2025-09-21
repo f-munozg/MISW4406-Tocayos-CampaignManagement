@@ -20,7 +20,7 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-TOPIC_CAMPAIGN = "loyalty-events"
+TOPIC_LOYALTY = "loyalty-events"
 SUBSCRIPTION  = "campaign-projection"
 
 class EventConsumerService:
@@ -32,19 +32,19 @@ class EventConsumerService:
         self.app = app  # Store Flask app reference
         
         if self.use_new_handlers:
-            logger.info("Using new event handlers")
+            logger.info("Projections using new event handlers")
         else:
-            logger.info("Using legacy event handlers")
+            logger.info("Projections using legacy event handlers")
     
     def start_consuming(self):
         """Start consuming events with proper error handling"""
         try:
-            topic_name = self.config.get_topic_name(TOPIC_CAMPAIGN)
-            logger.info(f"Starting to consume from topic: {topic_name}")
+            topic_name = self.config.get_topic_name(TOPIC_LOYALTY)
+            logger.info(f"Projections starting to consume from topic: {topic_name}")
             
             self.running = True
             self.consumer.subscribe_to_topic(topic_name, SUBSCRIPTION, self._on_message)
-            logger.info("Successfully started consuming events")
+            logger.info("Projections successfully started consuming events")
             
         except Exception as e:
             logger.error(f"Failed to start consuming events: {e}")
@@ -85,7 +85,7 @@ class EventConsumerService:
                 else:
                     logger.warning("No Flask app context available for new handlers, falling back to legacy")
                     # Fall back to legacy handlers
-                    if et == "CampaignCreated":
+                    if et == "CommandCreateCampaign":
                         self._apply_campaign_created(payload)
                     elif et == "CampaignActivated":
                         self._apply_campaign_status_change(payload, "activa")
@@ -97,7 +97,7 @@ class EventConsumerService:
                         logger.info("Evento ignorado: %s", et)
             else:
                 # Use legacy handlers
-                if et == "CampaignCreated":
+                if et == "CommandCreateCampaign":
                     self._apply_campaign_created(payload)
                 elif et == "CampaignActivated":
                     self._apply_campaign_status_change(payload, "activa")
