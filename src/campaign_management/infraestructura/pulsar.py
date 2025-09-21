@@ -92,8 +92,8 @@ class PulsarEventPublisher:
             producer = self._get_producer(topic_name)
             
             # Serializar el payload a JSON
-            if payload is None:
-                payload = {}
+            if evento is None:
+                evento = {}
             
 
             event_dict = {
