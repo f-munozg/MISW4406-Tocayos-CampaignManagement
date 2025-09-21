@@ -21,7 +21,9 @@ cfg = PulsarConfig()
 TOPIC_CAMPAIGN = cfg.get_topic_name("campaign-events")
 
 def _publish_one(conn, row):
-    payload = json.loads(row["payload"])
+    rowData = row["payload"]
+    logger.info(f"publishing to campaign topic content: {rowData}")
+    payload = json.loads(rowData)
     key = row["aggregate_id"]
     
     logger.info(f"Publishing to campaign topic: {TOPIC_CAMPAIGN}")

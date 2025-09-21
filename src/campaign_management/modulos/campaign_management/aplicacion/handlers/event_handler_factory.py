@@ -60,7 +60,7 @@ class EventHandlerFactory:
             event_type = event_data.get("event_type")
             logger.info(f"Handling event: {event_type}")
             
-            if event_type == "CampaignCreated":
+            if event_type == "CommandCreateCampaign":
                 # Handle with both write model and read model handlers
                 try:
                     # Write model handler (saves to campaigns table and outbox)
