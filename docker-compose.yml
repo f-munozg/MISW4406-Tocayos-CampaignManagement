@@ -70,6 +70,7 @@ services:
       PULSAR_NAMESPACE: campaign-management/events
       FLASK_ENV: production
       PYTHONPATH: /app/src
+      SERVICE_NAME: campaign-management-app
     volumes:
       - ./src:/app/src:ro
     ports:
@@ -95,6 +96,7 @@ services:
       PULSAR_SERVICE_URL: pulsar://pulsar:6650
       PULSAR_NAMESPACE: campaign-management/events
       PYTHONPATH: /app/src
+      SERVICE_NAME: campaign-management-projection
     volumes:
       - ./src:/app/src:ro
     restart: unless-stopped
@@ -114,6 +116,7 @@ services:
       PULSAR_SERVICE_URL: pulsar://pulsar:6650
       PULSAR_NAMESPACE: campaign-management/events
       PYTHONPATH: /app/src
+      SERVICE_NAME: campaign-management-outbox
     volumes:
       - ./src:/app/src:ro
     restart: unless-stopped

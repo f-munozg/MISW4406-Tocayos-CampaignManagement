@@ -1,5 +1,6 @@
 import logging
 import json
+import os
 from datetime import datetime
 from campaign_management.modulos.campaign_management.aplicacion.comandos.comandos_campana import CancelarCampana
 from flask import current_app
@@ -19,11 +20,12 @@ logger = logging.getLogger(__name__)
 # SUBSCRIPTION  = "campaigns-read-projection"
 
 class EventConsumerService:
-    def __init__(self, app=None):
+    def __init__(self, app=None, service_name: str = None):
         self.config = PulsarConfig()
         self.consumers = {}
         self.running = False
         self.app = app
+        self.service_name = service_name or os.getenv('SERVICE_NAME', 'campaign-management')
     
     def start_consuming(self):
         """Inicia el consumo de eventos para todos los módulos"""
@@ -54,12 +56,12 @@ class EventConsumerService:
     def _start_consumer(self, event_type: str, handler):
         """Inicia un consumidor para un tipo específico de evento"""
         try:
-            consumer = PulsarEventConsumer()
+            consumer = PulsarEventConsumer(service_name=self.service_name)
             topic_name = self.config.get_topic_name(event_type)
             subscription_name = f"{event_type}-subscription"
             consumer.subscribe_to_topic(topic_name, subscription_name, handler)
             self.consumers[event_type] = consumer
-            logger.info(f"Consumidor iniciado para {event_type}")
+            logger.info(f"Consumidor iniciado para {event_type} con servicio {self.service_name}")
         except Exception as e:
             logger.error(f"Error iniciando consumidor para {event_type}: {e}")
 

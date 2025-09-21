@@ -20,7 +20,7 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-TOPIC_CAMPAIGN = "campaign-events"
+TOPIC_CAMPAIGN = "loyalty-events"
 SUBSCRIPTION  = "campaign-projection"
 
 class EventConsumerService:

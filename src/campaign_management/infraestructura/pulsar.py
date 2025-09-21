@@ -159,10 +159,11 @@ class PulsarEventPublisher:
             self.client.close()
 
 class PulsarEventConsumer:
-    def __init__(self):
+    def __init__(self, service_name: str = None):
         self.config = PulsarConfig()
         self.client = None
         self.consumers = {}
+        self.service_name = service_name or os.getenv('SERVICE_NAME', 'campaign-management')
         
     def _get_client(self) -> Client:
         """Obtiene o crea el cliente de Pulsar"""
@@ -173,8 +174,11 @@ class PulsarEventConsumer:
     def subscribe_to_topic(self, topic_name: str, subscription_name: str, callback):
         """Se suscribe a un topic específico con mejor manejo de errores"""
         try:
+            # Create unique subscription name using service name
+            unique_subscription_name = f"{self.service_name}-{subscription_name}"
+            
             logger.info(f"Attempting to subscribe to topic: {topic_name}")
-            logger.info(f"Using subscription: {subscription_name}")
+            logger.info(f"Using subscription: {unique_subscription_name}")
             logger.info(f"Pulsar service URL: {self.config.service_url}")
             
             client = self._get_client()
@@ -182,7 +186,7 @@ class PulsarEventConsumer:
             
             consumer = client.subscribe(
                 topic=topic_name, 
-                subscription_name=subscription_name, 
+                subscription_name=unique_subscription_name, 
                 consumer_type=ConsumerType.Shared
             )
             logger.info("Pulsar consumer created successfully")
@@ -195,12 +199,12 @@ class PulsarEventConsumer:
             thread.daemon = True
             thread.start()
             
-            logger.info(f"Successfully subscribed to topic {topic_name} with subscription {subscription_name}")
+            logger.info(f"Successfully subscribed to topic {topic_name} with subscription {unique_subscription_name}")
             
         except Exception as e:
             logger.error(f"Error suscribiéndose al topic {topic_name}: {e}")
             logger.error(f"Topic name: {topic_name}")
-            logger.error(f"Subscription name: {subscription_name}")
+            logger.error(f"Subscription name: {unique_subscription_name}")
             logger.error(f"Service URL: {self.config.service_url}")
             raise
     
