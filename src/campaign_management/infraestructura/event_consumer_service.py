@@ -192,11 +192,11 @@ class EventConsumerService:
                 fecha_actualizacion=datetime.now()
             )
             # escribir en la cola de loyalty
-            pulsar_publisher.publish_event(evento, saga_id, 'loyalty-events', 'CommandCreateCampaign', 'Failed')
+            pulsar_publisher.publish_event(evento, saga_id, 'loyalty-events', 'CommandCreateCampaign', 'failed')
             # escribir en la cola de campaigns
 
             evento.motivo = "Se ha actualizado el estado de la campaña a cancelado"
-            pulsar_publisher.publish_event(evento, saga_id, 'campaign-events', 'EventCampaignRollbacked', 'Success')
+            pulsar_publisher.publish_event(evento, saga_id, 'campaign-events', 'EventCampaignRollbacked', 'success')
     
     def _apply_campaign_status_change(self, ev: dict, new_status: str):
         aggregate_id = ev.get("aggregate_id")
