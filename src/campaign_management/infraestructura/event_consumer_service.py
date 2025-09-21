@@ -102,17 +102,18 @@ class EventConsumerService:
     def _process_event(self, event_data: Dict[str, Any]):
         """Process the event within Flask application context"""
         event_type = event_data.get('event_type')
+        event_status = event_data.get('status')
         event_payload = event_data.get('event_data', {})
         
         logger.info(f"Procesando evento de campañas: {event_type}")
         
         # Aquí se pueden agregar lógicas específicas para cada tipo de evento
-        if event_type == 'CommandCreateCampaign':
+        if event_type == 'CommandCreateCampaign' and event_status == "success":
             self._apply_campaign_created(event_payload)
-        elif event_type == 'EventCampaignCreated':
+        elif event_type == 'EventCampaignCreated' and event_status == "failed":
             self._apply_campaign_reverse_created(event_payload)
         else:
-            logger.info("Evento ignorado: %s", event_type)
+            logger.info("Evento ignorado: %s %s", event_type, event_status)
 
     def _apply_campaign_created(self, ev: dict):
         data = ev.get("data", {})

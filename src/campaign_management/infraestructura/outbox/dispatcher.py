@@ -26,7 +26,7 @@ def _publish_one(conn, row):
     payload = json.loads(rowData["event_data"])
     key = row["event_id"]
     
-    logger.info(f"Publishing to campaign topic: {TOPIC_CAMPAIGN}")
+    logger.info(f"Publishing to campaign topic: {TOPIC_CAMPAIGN} with key: {key}")
     pulsar_publisher.publish_json(TOPIC_CAMPAIGN, key=key, payload=payload)
     
     conn.execute(

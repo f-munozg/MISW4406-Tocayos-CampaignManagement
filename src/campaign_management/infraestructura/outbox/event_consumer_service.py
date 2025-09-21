@@ -69,12 +69,12 @@ class EventConsumerService:
         """Handle incoming messages with error recovery"""
         try:
             if not self.running:
-                logger.info("Consumer stopped, ignoring message")
+                logger.info("Projections consumer stopped, ignoring message")
                 return
                 
             et = payload.get("event_type")
-            logger.info(f"Processing event: {et}")
-            logger.info(f"Full payload structure: {payload}")
+            logger.info(f"Projections processing event: {et}")
+            logger.info(f"Projections full payload structure: {payload}")
             
             # Use new handlers if available and enabled
             if self.use_new_handlers:
@@ -83,7 +83,7 @@ class EventConsumerService:
                     with self.app.app_context():
                         EventHandlerFactory.handle_event(payload)
                 else:
-                    logger.warning("No Flask app context available for new handlers, falling back to legacy")
+                    logger.warning("No Flask app context available for new handlers in projections, falling back to legacy")
                     # Fall back to legacy handlers
                     if et == "CommandCreateCampaign":
                         self._apply_campaign_created(payload)
@@ -117,7 +117,7 @@ class EventConsumerService:
     def _apply_campaign_created(self, ev: dict):
         """Apply CampaignCreated event to read model with error handling"""
         try:
-            logger.info(f"Processing CampaignCreated event: {ev}")
+            logger.info(f"Projections processing CampaignCreated event: {ev}")
             
             # Try multiple ways to get the campaign ID
             aggregate_id = None
