@@ -188,6 +188,7 @@ class EventConsumerService:
 
             camp.estado = 'cancelada'
             camp.fecha_ultima_actividad = datetime.utcnow()
+            
         # Publicar eventos después de cerrar la transacción
         evento = CancelarCampana(
             id_campana=outbox.aggregate_id if outbox else None,

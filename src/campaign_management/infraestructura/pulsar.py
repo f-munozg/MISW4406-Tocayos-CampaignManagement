@@ -59,10 +59,10 @@ class PulsarEventPublisher:
             self.producers[topic_name] = client.create_producer(topic_name)
         return self.producers[topic_name]
     
-    def publish_event(self, saga_id: uuid, evento: EventoDominio, event_type: str, status: str):
+    def publish_event(self, evento: EventoDominio, saga_id: uuid, topic: str, event_type: str, status: str):
         """Publica un evento en Pulsar"""
         try:
-            topic_name = self.config.get_topic_name(event_type)
+            topic_name = self.config.get_topic_name(topic)
             producer = self._get_producer(topic_name)
             
             # Serializar el evento
@@ -84,6 +84,7 @@ class PulsarEventPublisher:
         except Exception as e:
             logger.error(f"Error publicando evento en Pulsar: {e}")
             raise
+                
     
     def publish_json(self, saga_id: uuid, event_data: dict, event_type: str, status: str):
         """Publica un payload JSON en Pulsar"""
