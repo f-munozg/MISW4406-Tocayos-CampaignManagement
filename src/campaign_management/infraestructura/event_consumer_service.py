@@ -188,20 +188,18 @@ class EventConsumerService:
 
             camp.estado = 'cancelada'
             camp.fecha_ultima_actividad = datetime.utcnow()
-            db.session.commit()
-
-            evento = CancelarCampana(
-                id_campana=camp.id,
-                motivo='Se presento un error con la creacion de la campaña',
-                saga_id=saga_id,
-                fecha_actualizacion=datetime.now()
-            )
-            # escribir en la cola de loyalty
-            pulsar_publisher.publish_event(evento, saga_id, 'loyalty-events', 'CommandCreateCampaign', 'failed')
-            # escribir en la cola de campaigns
-
-            evento.motivo = "Se ha actualizado el estado de la campaña a cancelado"
-            pulsar_publisher.publish_event(evento, saga_id, 'campaign-events', 'EventCampaignRollbacked', 'success')
+        # Publicar eventos después de cerrar la transacción
+        evento = CancelarCampana(
+            id_campana=outbox.aggregate_id if outbox else None,
+            motivo='Se presento un error con la creacion de la campaña',
+            saga_id=saga_id,
+            fecha_actualizacion=datetime.now()
+        )
+        # escribir en la cola de loyalty
+        pulsar_publisher.publish_event(evento, saga_id, 'loyalty-events', 'CommandCreateCampaign', 'failed')
+        # escribir en la cola de campaigns
+        evento.motivo = "Se ha actualizado el estado de la campaña a cancelado"
+        pulsar_publisher.publish_event(evento, saga_id, 'campaign-events', 'EventCampaignRollbacked', 'success')
     
     def _apply_campaign_status_change(self, ev: dict, new_status: str):
         aggregate_id = ev.get("aggregate_id")
