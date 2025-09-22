@@ -172,7 +172,6 @@ class EventConsumerService:
     def _apply_campaign_reverse_created(self, ev: dict, saga_id: str):
         data = ev.get("data", {})
         id = data.get("id")
-        saga_id = data.get("saga_id")
         if id is None:
             id = uuid.uuid4()
 
