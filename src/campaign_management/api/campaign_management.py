@@ -49,6 +49,7 @@ def crear_campana():
         
         comando = CrearCampana(
             id=campana_dto.id,
+            saga_id=campana_dto.saga_id,
             id_marca=campana_dto.id_marca,
             nombre=campana_dto.nombre,
             descripcion=campana_dto.descripcion,

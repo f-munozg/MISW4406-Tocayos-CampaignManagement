@@ -99,10 +99,10 @@ class PulsarEventPublisher:
                 'saga_id': saga_id,
                 'service': 'Campaign',
                 'status': status, 
-                #'event_id': evento.id,
+                'event_id': event_data.get('event_id'),
                 'event_type': "EventCampaignCreated",
                 'event_data': event_data,
-                #'timestamp': evento.fecha_evento.isoformat() if hasattr(evento, 'fecha_evento') else None
+                'timestamp': event_data.get('timestamp')
             }
 
             json_data = json.dumps(event_dict, default=str)

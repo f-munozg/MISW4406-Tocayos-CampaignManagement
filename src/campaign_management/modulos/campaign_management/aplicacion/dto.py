@@ -11,6 +11,7 @@ import uuid
 @dataclass
 class CampanaDTO:
     id: str
+    saga_id: str
     id_marca: str
     nombre: str
     descripcion: str = ""

@@ -14,6 +14,7 @@ class MapeadorCampana:
     def dto_a_entidad(self, dto: CampanaDTO) -> Campana:
         campana = Campana()
         campana.id = uuid.UUID(dto.id)
+        campana.saga_id = uuid.UUID(dto.saga_id)
         campana.id_marca = uuid.UUID(dto.id_marca)
         campana.nombre = dto.nombre
         campana.descripcion = dto.descripcion
@@ -40,6 +41,7 @@ class MapeadorCampana:
     def entidad_a_dto(self, entidad: Campana) -> CampanaDTO:
         return CampanaDTO(
             id=str(entidad.id),
+            saga_id=str(entidad.saga_id),
             id_marca=str(entidad.id_marca),
             nombre=entidad.nombre,
             descripcion=entidad.descripcion,
@@ -67,6 +69,7 @@ class MapeadorCampanaDTOJson:
     def externo_a_dto(self, externo: dict) -> CampanaDTO:
         return CampanaDTO(
             id=externo.get('id', str(uuid.uuid4())),
+            saga_id=externo.get('saga_id', ''),
             id_marca=externo.get('id_marca', ''),
             nombre=externo.get('nombre', ''),
             descripcion=externo.get('descripcion', ''),
@@ -92,6 +95,7 @@ class MapeadorCampanaDTOJson:
     def dto_a_externo(self, dto: CampanaDTO) -> dict:
         return {
             'id': dto.id,
+            'saga_id': dto.saga_id,
             'id_marca': dto.id_marca,
             'nombre': dto.nombre,
             'descripcion': dto.descripcion,

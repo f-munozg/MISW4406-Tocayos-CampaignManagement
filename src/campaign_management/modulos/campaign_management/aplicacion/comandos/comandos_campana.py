@@ -14,6 +14,7 @@ import uuid
 @dataclass
 class CrearCampana(Comando):
     id: str
+    saga_id: str
     id_marca: str
     nombre: str
     tipo_campana: str

@@ -24,7 +24,7 @@ def _publish_one(conn, row):
     rowData = row
     logger.info(f"publishing to campaign topic content: {rowData}")
     payload = json.loads(rowData["event_data"])
-    key = row["event_id"]
+    key = row["saga_id"]
     
     logger.info(f"Publishing to campaign topic: {TOPIC_CAMPAIGN} with key: {key}")
     pulsar_publisher.publish_json(key, payload, TOPIC_CAMPAIGN, "success")
@@ -41,6 +41,7 @@ def publish_pending_batch(batch_size: int = 200):
             text("""
                 SELECT 
                     id,
+                    saga_id,
                     aggregate_type as service, 
                     status, 
                     aggregate_id as event_id, 

@@ -28,6 +28,7 @@ def manejar_crear_campana(cmd: CrearCampana):
 
         camp = CampanaDBModel(
             id_marca          = cmd.id_marca,
+            saga_id           = cmd.saga_id,
             nombre            = cmd.nombre,
             descripcion       = cmd.descripcion,
             tipo_campana      = cmd.tipo_campana,
@@ -64,6 +65,7 @@ def manejar_crear_campana(cmd: CrearCampana):
         }
 
         out = OutboxEvent(
+            saga_id=cmd.saga_id,
             aggregate_id=camp.id,
             aggregate_type="Campaign",
             event_type="CampaignCreated",
