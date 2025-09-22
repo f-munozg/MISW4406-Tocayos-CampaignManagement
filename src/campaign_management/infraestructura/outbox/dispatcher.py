@@ -49,7 +49,7 @@ def publish_pending_batch(batch_size: int = 200):
                     payload as event_data, 
                     occurred_at as timestamp
                 FROM outbox_events
-                WHERE status = 'PENDING'
+                WHERE status in ('PENDING', 'FAILED')
                 ORDER BY occurred_at
                 LIMIT :n
                 FOR UPDATE SKIP LOCKED
