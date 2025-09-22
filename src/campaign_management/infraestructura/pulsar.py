@@ -102,7 +102,7 @@ class PulsarEventPublisher:
                 'service': 'Campaign',
                 'status': status, 
                 #'event_id': evento.id,
-                'event_type': event_type,
+                'event_type': "EventCampaignCreated",
                 'event_data': event,
                 #'timestamp': evento.fecha_evento.isoformat() if hasattr(evento, 'fecha_evento') else None
             }
