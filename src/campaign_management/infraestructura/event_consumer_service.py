@@ -58,7 +58,7 @@ class EventConsumerService:
         try:
             consumer = PulsarEventConsumer(service_name=self.service_name)
             topic_name = self.config.get_topic_name(event_type)
-            subscription_name = f"{event_type}-subscription"
+            subscription_name = f"campaign-management-subscription"
             consumer.subscribe_to_topic(topic_name, subscription_name, handler)
             self.consumers[event_type] = consumer
             logger.info(f"Consumidor iniciado para {event_type} con servicio {self.service_name}")
