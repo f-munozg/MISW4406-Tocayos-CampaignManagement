@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 cfg = PulsarConfig()
 
 # Use proper topic names with tenant and namespace
-TOPIC_CAMPAIGN = cfg.get_topic_name("campaign-events")
+TOPIC_CAMPAIGN = "campaign-events"
 
 def _publish_one(conn, row):
     rowData = row
