@@ -179,12 +179,12 @@ class EventConsumerService:
             # buscar la campaña y cambiarle el estado
             outbox = db.session.query(OutboxEvent).filter(OutboxEvent.saga_id == saga_id).first()
             logger.info("outbox: %s", outbox)
-            if not outbox:
+            if outbox is None:
                 logger.info(f"Clase: EventConsumerService | Metodo: _apply_campaign_reverse_created | Linea: 183")
                 logger.info("Evento %s para saga_id inexistente %s", ev.get("event_type"), saga_id)
                 return
             camp: CampanaDBModel | None = db.session.get(CampanaDBModel, outbox.id)
-            if not camp:
+            if camp is None:
                 logger.info(f"Clase: EventConsumerService | Metodo: _apply_campaign_reverse_created | Linea: 178")
                 logger.info("Evento %s para campaña inexistente %s", ev.get("event_type"), id)
                 return
