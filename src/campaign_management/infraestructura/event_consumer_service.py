@@ -106,7 +106,7 @@ class EventConsumerService:
         saga_id = event_data.get('saga_id')
         event_payload = event_data.get('event_data', {})
         
-        logger.info(f"Procesando evento de campañas: {event_type} con status: {event_status}")
+        logger.info(f"Procesando evento de campañas: {event_type} con status: {event_status} y saga_id: {saga_id}")
         logger.info(f"Evento payload: {event_payload}")
         
         # Aquí se pueden agregar lógicas específicas para cada tipo de evento
@@ -177,7 +177,8 @@ class EventConsumerService:
 
         with db.session.begin():
             # buscar la campaña y cambiarle el estado
-            outbox: OutboxEvent | None = db.session.query(OutboxEvent).filter(OutboxEvent.saga_id == saga_id).first()
+            outbox = db.session.query(OutboxEvent).filter(OutboxEvent.saga_id == saga_id).first()
+            logger.info("outbox: %s", outbox)
             if not outbox:
                 logger.info(f"Clase: EventConsumerService | Metodo: _apply_campaign_reverse_created | Linea: 183")
                 logger.info("Evento %s para saga_id inexistente %s", ev.get("event_type"), saga_id)
