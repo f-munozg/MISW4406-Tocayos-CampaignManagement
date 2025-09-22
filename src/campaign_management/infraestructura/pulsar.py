@@ -94,8 +94,6 @@ class PulsarEventPublisher:
             # Serializar el payload a JSON
             if event_data is None:
                 event_data = {}
-            
-            event = json.dumps(event_data, default=str)
 
             event_dict = {
                 'saga_id': saga_id,
@@ -103,10 +101,9 @@ class PulsarEventPublisher:
                 'status': status, 
                 #'event_id': evento.id,
                 'event_type': "EventCampaignCreated",
-                'event_data': event,
+                'event_data': event_data,
                 #'timestamp': evento.fecha_evento.isoformat() if hasattr(evento, 'fecha_evento') else None
             }
-
 
             json_data = json.dumps(event_dict, default=str)
             
