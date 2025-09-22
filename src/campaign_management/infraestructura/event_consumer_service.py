@@ -188,7 +188,7 @@ class EventConsumerService:
 
             camp.estado = 'cancelada'
             camp.fecha_ultima_actividad = datetime.utcnow()
-            db.session.commit(camp)
+            db.session.commit()
 
             evento = CancelarCampana(
                 id_campana=camp.id,
