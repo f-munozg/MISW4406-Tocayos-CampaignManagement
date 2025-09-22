@@ -103,6 +103,7 @@ class EventConsumerService:
         """Process the event within Flask application context"""
         event_type = event_data.get('event_type')
         event_status = event_data.get('status')
+        saga_id = event_data.get('saga_id')
         event_payload = event_data.get('event_data', {})
         
         logger.info(f"Procesando evento de campañas: {event_type} con status: {event_status}")
@@ -110,13 +111,13 @@ class EventConsumerService:
         
         # Aquí se pueden agregar lógicas específicas para cada tipo de evento
         if event_type == 'CommandCreateCampaign' and event_status == "success":
-            self._apply_campaign_created(event_payload)
+            self._apply_campaign_created(event_payload, saga_id)
         elif event_type == 'EventCampaignCreated' and event_status == "failed":
-            self._apply_campaign_reverse_created(event_payload)
+            self._apply_campaign_reverse_created(event_payload, saga_id)
         else:
             logger.info("Evento ignorado: %s %s", event_type, event_status)
 
-    def _apply_campaign_created(self, ev: dict):
+    def _apply_campaign_created(self, ev: dict, saga_id: str):
         data = ev.get("data", {})
         aggregate_id = data.get("id")
         if aggregate_id is None:
@@ -159,7 +160,7 @@ class EventConsumerService:
             
             # Save to outbox table for event publishing
             outbox_event = OutboxEvent(
-                saga_id = data.get("saga_id"),
+                saga_id = saga_id,
                 aggregate_id=aggregate_id,
                 aggregate_type='Campaign',
                 event_type='EventCampaignCreated',
@@ -168,7 +169,7 @@ class EventConsumerService:
             )
             db.session.add(outbox_event)
 
-    def _apply_campaign_reverse_created(self, ev: dict):
+    def _apply_campaign_reverse_created(self, ev: dict, saga_id: str):
         data = ev.get("data", {})
         id = data.get("id")
         saga_id = data.get("saga_id")
@@ -190,6 +191,7 @@ class EventConsumerService:
             evento = CancelarCampana(
                 id_campana=camp.id,
                 motivo='Se presento un error con la creacion de la campaña',
+                saga_id=saga_id,
                 fecha_actualizacion=datetime.now()
             )
             # escribir en la cola de loyalty

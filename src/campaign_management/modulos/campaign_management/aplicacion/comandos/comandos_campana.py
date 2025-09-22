@@ -59,6 +59,7 @@ class FinalizarCampana(Comando):
 @dataclass
 class CancelarCampana(Comando):
     id_campana: str
+    saga_id: str
     motivo: str = ""
     fecha_actualizacion:Optional[str] = None
 
