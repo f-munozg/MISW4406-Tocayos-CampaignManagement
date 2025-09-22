@@ -171,9 +171,6 @@ class EventConsumerService:
 
     def _apply_campaign_reverse_created(self, ev: dict, saga_id: str):
         data = ev.get("data", {})
-        id = data.get("id")
-        if id is None:
-            id = uuid.uuid4()
 
         with db.session.begin():
             # buscar la campaña y cambiarle el estado
@@ -183,10 +180,10 @@ class EventConsumerService:
                 logger.info(f"Clase: EventConsumerService | Metodo: _apply_campaign_reverse_created | Linea: 183")
                 logger.info("Evento %s para saga_id inexistente %s", ev.get("event_type"), saga_id)
                 return
-            camp: CampanaDBModel | None = db.session.get(CampanaDBModel, outbox.id)
+            camp: CampanaDBModel | None = db.session.get(CampanaDBModel, outbox.aggregate_id)
             if camp is None:
                 logger.info(f"Clase: EventConsumerService | Metodo: _apply_campaign_reverse_created | Linea: 178")
-                logger.info("Evento %s para campaña inexistente %s", ev.get("event_type"), id)
+                logger.info("Evento %s para campaña inexistente %s", ev.get("event_type"), outbox.aggregate_id)
                 return
 
             camp.estado = 'cancelada'
