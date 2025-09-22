@@ -105,7 +105,8 @@ class EventConsumerService:
         event_status = event_data.get('status')
         event_payload = event_data.get('event_data', {})
         
-        logger.info(f"Procesando evento de campañas: {event_type}")
+        logger.info(f"Procesando evento de campañas: {event_type} con status: {event_status}")
+        logger.info(f"Evento payload: {event_payload}")
         
         # Aquí se pueden agregar lógicas específicas para cada tipo de evento
         if event_type == 'CommandCreateCampaign' and event_status == "success":
